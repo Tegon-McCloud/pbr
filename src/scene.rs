@@ -1,18 +1,39 @@
+use crate::material::Material;
+use nalgebra::{Point3, Affine3};
 
+#[derive(Clone, Copy, Default)]
 pub struct Vertex {
-    position: [f32; 3],
+    pub position: Point3<f32>,
 }
 
 pub struct Mesh {
-    indices: Vec<u32>,
-    vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
+    pub vertices: Vec<Vertex>,
 }
 
-
+pub struct Node {
+    pub children: Vec<Node>,
+    pub transform: Affine3<f32>,
+    pub meshes: Vec<Mesh>,
+}
 
 pub struct Scene {
+    pub root: Node,
+}
+
+impl Scene {
 
 
+    
+}
 
-    meshes: Vec<Mesh>,
+impl Default for Node {
+    fn default() -> Self {
+        Node {
+            children: Vec::new(),
+            transform: Affine3::identity(),
+            meshes: Vec::new(),
+        }
+    }
+
 }
