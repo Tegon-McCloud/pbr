@@ -17,6 +17,7 @@ pub struct Node {
     pub meshes: Vec<Mesh>,
 }
 
+#[derive(Default)]
 pub struct Scene {
     pub root: Node,
 }
