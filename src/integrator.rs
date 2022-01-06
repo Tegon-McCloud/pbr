@@ -6,23 +6,23 @@ pub trait Integrator {
 }
 
 
-pub struct RecursiveIntegrator<A> {
+pub struct Recursive<A> {
     depth: u32,
     phantom: std::marker::PhantomData<A>,
 }
 
-impl<A> RecursiveIntegrator<A> 
+impl<A> Recursive<A> 
     where A: Accelerator
 {
-    pub fn new(depth: u32) -> RecursiveIntegrator<A> {
-        RecursiveIntegrator {
+    pub fn new(depth: u32) -> Recursive<A> {
+        Recursive {
             depth: depth,
             phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<A> Integrator for RecursiveIntegrator<A> 
+impl<A> Integrator for Recursive<A> 
     where A: Accelerator
 {
     fn render(&self,  scene: Scene) {

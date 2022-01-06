@@ -1,3 +1,5 @@
+use std::ops::Mul;
+
 use crate::material::Material;
 use nalgebra::{Point3, Affine3};
 
@@ -6,9 +8,10 @@ pub struct Vertex {
     pub position: Point3<f32>,
 }
 
+#[derive(Clone, Default)]
 pub struct Mesh {
-    pub indices: Vec<u32>,
     pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
 }
 
 pub struct Node {
@@ -23,8 +26,21 @@ pub struct Scene {
 }
 
 impl Scene {
+    pub fn get_transformed_meshes(self) -> Vec<Mesh> {
+        fn get_meshes_recursive(node: &Node, parent_transform: Affine3<f32>, meshes: &mut Vec<Mesh>) {
+            let transform = parent_transform * node.transform;
+            meshes.extend(node.meshes.into_iter().map(|mesh| transform * mesh));
+            
+            for child in node.children.iter() {
+                get_meshes_recursive(child, transform, meshes)
+            }
+        }
 
+        let mut meshes = Vec::<Mesh>::new();
+        get_meshes_recursive(&self.root, Affine3::identity(), &mut meshes);
 
+        meshes
+    }
     
 }
 
@@ -36,5 +52,23 @@ impl Default for Node {
             meshes: Vec::new(),
         }
     }
+}
 
+impl Mul<Mesh> for Affine3<f32> {
+    type Output = Mesh;
+    fn mul(self, rhs: Mesh) -> Self::Output {
+        for vertex in rhs.vertices {
+            vertex = self * vertex;
+        }
+        rhs
+    }
+}
+
+impl Mul<Vertex> for Affine3<f32> {
+    type Output = Vertex;
+    fn mul(self, rhs: Vertex) -> Self::Output {
+        rhs.position = self * rhs.position;
+        
+        rhs
+    }
 }

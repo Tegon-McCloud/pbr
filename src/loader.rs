@@ -1,7 +1,5 @@
 mod gltf;
-
-pub use gltf::GltfLoader;
-
+use crate::loader::gltf::GltfLoader;
 use crate::scene::Scene;
 
 use std::path::Path;
