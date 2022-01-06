@@ -2,6 +2,7 @@
 extern crate nalgebra;
 extern crate gltf;
 
+mod common;
 mod scene;
 mod loader;
 mod material;
