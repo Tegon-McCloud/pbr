@@ -1,13 +1,17 @@
 use nalgebra::Affine3;
 
 use crate::scene::{Scene, Mesh, Vertex};
-use crate::material::Material;
-use crate::common::Ray;
+use crate::material::{Material, self};
+use crate::geometry::{Ray, SurfacePoint, triangle_intersect};
 
 pub trait Accelerator {
     fn from_scene(scene: Scene) -> Self;
+    fn empty() -> Self;
 
 
+    
+    fn intersect(&self, ray: Ray) -> Option<(f32, SurfacePoint)>;
+    //fn does_intersect(&self, ray: Ray) -> bool;
 }
 
 enum BvhNode {
@@ -46,6 +50,47 @@ impl Accelerator for Trivial {
             vertices,
             triangles,
         }
+    }
+
+    fn empty() -> Self {
+        let materials = Vec::new();
+        let vertices = Vec::new();
+        let triangles = Vec::new();
+
+        Trivial { materials, vertices, triangles }
+    }
+
+
+
+    fn intersect(&self, ray: Ray) -> Option<(f32, SurfacePoint)> {
+        let (t, p, bary) = self.triangles.iter()
+            .zip(self.vertices.iter())
+            .map(
+                |(triangles, vertices)| triangles.iter().map(
+                    |triangle| [
+                        &vertices[triangle[0] as usize],
+                        &vertices[triangle[1] as usize],
+                        &vertices[triangle[2] as usize]
+                    ]
+                )
+            )
+            .flatten()
+            .map(
+                |triangle| triangle_intersect(
+                    &triangle[0].position,
+                    &triangle[1].position,
+                    &triangle[2].position,
+                    &ray
+                )
+            )
+            .flatten()
+            .min_by(|(t1, _, _), (t2, _, _)| t1.total_cmp(t2))?;
+
+        let p = SurfacePoint {
+            position: p,
+        };
+
+        Some((t, p))
     }
 
 }

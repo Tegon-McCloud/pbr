@@ -1,27 +1,20 @@
 mod gltf;
-use crate::loader::gltf::GltfLoader;
+
+pub use crate::loader::gltf::Gltf;
+
 use crate::scene::Scene;
 
 use std::path::Path;
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Result, Read, Seek};
 
-trait Loader {
-    fn load(path: &Path) -> Result<Scene>;
+pub trait Loader {
+    fn load_from_file(path: &Path) -> Result<Scene>;
+    fn load_from_reader<R: Read + Seek>(rdr: &mut R) -> Result<Scene>;
 }
 
 impl Scene {
-    pub fn from_file(path: &Path) -> Result<Self> {
-
-        if let Some(extension) = path.extension() {
-
-            if extension.eq_ignore_ascii_case("gltf") || extension.eq_ignore_ascii_case("glb") {
-                GltfLoader::load(path)
-            } else {
-                Err(Error::new(ErrorKind::InvalidData, format!("Unknown format: {:?}.", extension)))
-            }
-        } else {
-            Err(Error::new(ErrorKind::InvalidData, format!("Format could not be determined for file: {:?}.", path.as_os_str())))
-        }
+    pub fn from_file<L: Loader>(path: &Path) -> Result<Self> {
+        L::load_from_file(path)
     }
 }
 

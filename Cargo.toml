@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 nalgebra = { version = "0.30", features = ["serde-serialize"] }
+float-cmp = "0.9.0"
 gltf = "0.16"
+rayon = "1.5"
