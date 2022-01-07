@@ -1,16 +1,13 @@
-use nalgebra::Affine3;
 
-use crate::scene::{Scene, Mesh, Vertex};
-use crate::material::{Material, self};
+use crate::scene::{Node, Vertex};
+use crate::material::{Material};
 use crate::geometry::{Ray, SurfacePoint, triangle_intersect};
 
 pub trait Accelerator {
-    fn from_scene(scene: Scene) -> Self;
+    fn from_scene_node(node: Node) -> Self;
     fn empty() -> Self;
 
-
-    
-    fn intersect(&self, ray: Ray) -> Option<(f32, SurfacePoint)>;
+    fn intersect(&self, ray: &Ray) -> Option<(f32, SurfacePoint)>;
     //fn does_intersect(&self, ray: Ray) -> bool;
 }
 
@@ -32,9 +29,9 @@ pub struct Trivial {
 
 impl Accelerator for Trivial {
 
-    fn from_scene(scene: Scene) -> Self {
-        let meshes = scene.get_transformed_meshes();
-        
+    fn from_scene_node(node: Node) -> Self {
+        let meshes = node.flatten();
+
         let (vertices, triangles): (Vec<Vec<Vertex>>, Vec<Vec<[u32; 3]>>) = meshes.into_iter()
             .map(|mesh| (
                 mesh.vertices,
@@ -62,7 +59,7 @@ impl Accelerator for Trivial {
 
 
 
-    fn intersect(&self, ray: Ray) -> Option<(f32, SurfacePoint)> {
+    fn intersect(&self, ray: &Ray) -> Option<(f32, SurfacePoint)> {
         let (t, p, bary) = self.triangles.iter()
             .zip(self.vertices.iter())
             .map(

@@ -28,25 +28,26 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn get_transformed_meshes(self) -> Vec<Mesh> {
-        fn get_meshes_recursive(node: Node, parent_transform: Affine3<f32>, meshes: &mut Vec<Mesh>) {
-            let transform = parent_transform * node.transform;
-            meshes.extend(node.meshes.into_iter().map(|mesh| transform * mesh));
-            
-            for child in node.children.into_iter() {
-                get_meshes_recursive(child, transform, meshes)
-            }
-        }
 
-        let mut meshes = Vec::<Mesh>::new();
-        get_meshes_recursive(self.root, Affine3::identity(), &mut meshes);
+    
+}
 
-
-        
-
+impl Node {
+    pub fn flatten(self) -> Vec<Mesh> {
+        let mut meshes = Vec::new();
+        self.flatten_recursive(&Affine3::identity(), &mut meshes);
         meshes
     }
-    
+
+    fn flatten_recursive(self, parent_transform: &Affine3<f32>, meshes: &mut Vec<Mesh>) {
+        let transform = parent_transform * self.transform;
+        meshes.extend(self.meshes.into_iter().map(|mesh| transform * mesh));
+
+        for child in self.children.into_iter() {
+            child.flatten_recursive(&transform, meshes)
+        }
+    }
+
 }
 
 impl Default for Node {

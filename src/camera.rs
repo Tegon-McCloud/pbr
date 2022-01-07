@@ -1,4 +1,6 @@
-use nalgebra::{Point3, Vector3};
+use nalgebra::{Point3, Vector3, Point2, Vector2};
+
+use crate::geometry::Ray;
 
 pub enum Camera {
     Perspective(PerspectiveCamera),
@@ -6,7 +8,7 @@ pub enum Camera {
 
 impl Camera {
     pub fn perspective_look_at(pos: &Point3<f32>, focus: &Point3<f32>, up_dir: &Vector3<f32>, vfov: f32, aspect: f32) -> Camera {
-        Self::perspective_look_to(pos, &(pos - focus), up_dir, vfov, aspect)
+        Self::perspective_look_to(pos, &(focus - pos), up_dir, vfov, aspect)
     }
 
     pub fn perspective_look_to(pos: &Point3<f32>, forward: &Vector3<f32>, up_dir: &Vector3<f32>, vfov: f32, aspect: f32) -> Camera {
@@ -25,6 +27,12 @@ impl Camera {
             vertical: up * tan_vfov
         })
     }
+
+    pub fn get_ray(&self, uv: &Point2<f32>) -> Ray {
+        match self {
+            Self::Perspective(camera) => camera.get_ray(uv),
+        }
+    } 
 }
 
 impl Default for Camera {
@@ -43,4 +51,13 @@ pub struct PerspectiveCamera  {
     forward: Vector3<f32>,
     horizontal: Vector3<f32>,
     vertical: Vector3<f32>,
+}
+
+impl PerspectiveCamera {
+    fn get_ray(&self, uv: &Point2<f32>) -> Ray {
+        let uv = 2.0 * uv - Vector2::new(1.0, 1.0);
+        let origin = self.position;
+        let direction = (self.forward + uv.x * self.horizontal + uv.y * self.vertical).normalize();
+        Ray { origin, direction }
+    }
 }
