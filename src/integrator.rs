@@ -1,5 +1,5 @@
-use nalgebra::{Vector3, Vector4};
-use rayon::iter::{ParallelIterator, IndexedParallelIterator};
+use nalgebra::{Vector3, Vector4, Matrix3};
+use rayon::iter::ParallelIterator;
 
 use crate::accelerator::Accelerator;
 use crate::geometry::Ray;
@@ -9,7 +9,6 @@ use crate::scene::Scene;
 pub trait Integrator {
     fn render(&self, scene: Scene, target: &mut RenderTarget);
 }
-
 
 pub struct BruteForce<A> {
     depth: u32,
@@ -29,7 +28,16 @@ impl<A> BruteForce<A>
     }
 
     fn sample_radiance(&self, ray: &Ray, accel: &A) -> Vector3<f32> {
-        if accel.intersect(ray).is_some() {
+        if let Some((_t, p)) = accel.intersect(ray) {
+            
+            let t = p.tangent;
+            let n = p.normal;
+            let b = n.cross(&t);
+
+            let world_to_tangent = Matrix3::from_columns(&[t, b, n]).transpose_mut();
+
+
+
             Vector3::new(1.0, 1.0, 1.0)
         } else {
             Vector3::zeros()
@@ -45,7 +53,7 @@ impl<A> Integrator for BruteForce<A>
         let camera = scene.camera;
         let accel = A::from_scene_node(scene.root);
 
-        target.pixels_mut().for_each(|(uv, px)| {
+        target.pixels_par_mut().for_each(|(uv, px)| {
             let mut radiance = Vector3::zeros();
 
             for _ in 0..self.spp {

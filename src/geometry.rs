@@ -1,4 +1,7 @@
+use float_cmp::approx_eq;
 use nalgebra::{Vector3, Point3};
+
+use crate::scene::Vertex;
 
 pub struct Ray {
     pub origin: Point3<f32>,
@@ -12,9 +15,28 @@ pub struct Bounds {
 
 pub struct SurfacePoint {
     pub position: Point3<f32>,
+    pub normal: Vector3<f32>,
+    pub tangent: Vector3<f32>,
 }
 
-pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, ray: &Ray) -> Option<(f32, Point3<f32>, Vector3<f32>)> {
+impl SurfacePoint {
+    pub fn interpolate(vertices: &[&Vertex; 3], barycentrics: &Vector3<f32>) -> SurfacePoint {
+        let b = barycentrics;
+        let [v1, v2, v3] = vertices;
+        
+
+        let position = Point3::from(v1.position.coords * b.x + v2.position.coords * b.y + v3.position.coords * b.z);
+        let normal = (v1.normal * b.x + v2.normal * b.y + v3.normal * b.z).normalize();
+        let tangent =  v1.tangent * b.x + v2.tangent * b.y + v3.tangent * b.z;
+        // gram-schmidt
+        let tangent = (tangent - normal * tangent.dot(&normal)).normalize();
+
+        SurfacePoint { position, normal, tangent }
+    }
+
+}
+
+pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, ray: &Ray) -> Option<(f32, Vector3<f32>)> {
     let e1 = p2 - p1;
     let e2 = p3 - p2;
     let e3 = p1 - p3;
@@ -40,7 +62,12 @@ pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, 
     let n3 = e3.cross(&(p - p3));
 
     if n.dot(&n1) >= 0.0 && n.dot(&n2) >= 0.0 && n.dot(&n3) > 0.0 {
-        return Some((t, p, Vector3::zeros()));
+        let b = Vector3::new(n2.norm(), n3.norm(), n1.norm());
+        let area = b.x + b.y + b.z;
+
+        //assert!(approx_eq!(f32, n.norm(), area, ulps = 2));
+
+        return Some((t, b/area));
     }
 
     None
@@ -64,11 +91,13 @@ mod test {
         );
 
         assert!(result.is_some());
-        let (t, p, _bary) = result.unwrap();
+        let (t, b) = result.unwrap();
+        
         assert!(approx_eq!(f32, t, 1.0, ulps = 2));
-        assert!(approx_eq!(f32, p.x, 0.25, ulps = 2));
-        assert!(approx_eq!(f32, p.y, 0.25, ulps = 2));
-        assert!(approx_eq!(f32, p.z, 0.0, ulps = 2));
+
+        assert!(approx_eq!(f32, b.x, 0.5, ulps = 2));
+        assert!(approx_eq!(f32, b.y, 0.25, ulps = 2));
+        assert!(approx_eq!(f32, b.z, 0.25, ulps = 2));
     }
     
     
@@ -117,5 +146,22 @@ mod test {
 
         assert!(result.is_none());
     }
+
+    // #[test]
+    // fn surface_point_interpolate() {
+        
+    //     let vertices = [
+    //         Vertex
+
+    //     ];
+
+    //     let result = SurfacePoint::interpolate(
+    //         Point3::new(0.0, 0.0, 0.0),
+    //         ,
+    //         ,
+    //     );
+
+    //     assert!()
+    // }
 
 }

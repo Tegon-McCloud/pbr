@@ -24,7 +24,7 @@ impl RenderTarget {
         self.dimensions.0 as f32 / self.dimensions.1 as f32
     }
     
-    pub fn pixels_mut<'a>(&'a mut self) -> impl ParallelIterator<Item=(Point2<f32>, &mut Vector4<f32>)> + 'a {
+    pub fn pixels_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item=(Point2<f32>, &mut Vector4<f32>)> + 'a {
         self.buffer.par_iter_mut()
             .enumerate()
             .map(|(pos, px)| {

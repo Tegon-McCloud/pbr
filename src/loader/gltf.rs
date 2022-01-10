@@ -1,6 +1,9 @@
 
 pub use gltf::Gltf;
 pub use gltf::Glb;
+use itertools::izip;
+use nalgebra::Vector3;
+use nalgebra::Vector4;
 
 use std::io::Read;
 use std::io::Seek;
@@ -72,9 +75,16 @@ fn make_mesh(gltf_prim: gltf::Primitive, data: &GltfData) -> Mesh {
         .into_u32()
         .collect();
 
-    let vertices = reader.read_positions()
-        .unwrap()
-        .map(|pos| Vertex { position: Point3::from(pos) } )
+    let vertices = izip!(
+        reader.read_positions().unwrap(),
+        reader.read_normals().unwrap(),
+        reader.read_tangents().unwrap()
+    )
+        .map(|(p, n, t)| Vertex {
+            position: Point3::from(p),
+            normal: Vector3::from(n),
+            tangent: Vector4::from(t).xyz() * t[3],
+        })
         .collect();
 
     Mesh { indices, vertices, }

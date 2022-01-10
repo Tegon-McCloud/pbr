@@ -2,11 +2,13 @@ use std::ops::Mul;
 
 use crate::material::Material;
 use crate::camera::Camera;
-use nalgebra::{Point3, Affine3};
+use nalgebra::{Point3, Vector3, Affine3};
 
 #[derive(Clone, Copy, Default)]
 pub struct Vertex {
     pub position: Point3<f32>,
+    pub normal: Vector3<f32>,
+    pub tangent: Vector3<f32>,
 }
 
 #[derive(Clone, Default)]
@@ -65,6 +67,8 @@ impl Mul<Mesh> for Affine3<f32> {
     fn mul(self, mut rhs: Mesh) -> Self::Output {
         for vertex in &mut rhs.vertices {
             vertex.position = self * vertex.position;
+            vertex.normal = self * vertex.normal;
+            vertex.tangent = self * vertex.tangent;
         }
         rhs
     }

@@ -1,4 +1,7 @@
 
+use itertools::izip;
+use nalgebra::{Point3, Vector3};
+
 use crate::scene::{Node, Vertex};
 use crate::material::{Material};
 use crate::geometry::{Ray, SurfacePoint, triangle_intersect};
@@ -60,34 +63,35 @@ impl Accelerator for Trivial {
 
 
     fn intersect(&self, ray: &Ray) -> Option<(f32, SurfacePoint)> {
-        let (t, p, bary) = self.triangles.iter()
-            .zip(self.vertices.iter())
-            .map(
-                |(triangles, vertices)| triangles.iter().map(
-                    |triangle| [
-                        &vertices[triangle[0] as usize],
-                        &vertices[triangle[1] as usize],
-                        &vertices[triangle[2] as usize]
-                    ]
-                )
-            )
-            .flatten()
-            .map(
-                |triangle| triangle_intersect(
-                    &triangle[0].position,
-                    &triangle[1].position,
-                    &triangle[2].position,
-                    &ray
-                )
-            )
-            .flatten()
-            .min_by(|(t1, _, _), (t2, _, _)| t1.total_cmp(t2))?;
 
-        let p = SurfacePoint {
-            position: p,
-        };
+        struct HitInfo<'a> {
+            t: f32,
+            b: Vector3<f32>,
+            vertices: [&'a Vertex; 3],
+        }
 
-        Some((t, p))
+        let mut info: Option<HitInfo> = None;
+        
+        for (triangles, vertices) in izip!(self.triangles.iter(), self.vertices.iter()) {
+            for triangle in triangles.iter() {
+
+                let v1 = &vertices[triangle[0] as usize];
+                let v2 = &vertices[triangle[1] as usize];
+                let v3 = &vertices[triangle[2] as usize];
+
+                if let Some((t, b)) = 
+                    triangle_intersect(&v1.position, &v2.position,&v3.position, ray) {
+                    
+                    if info.is_none() || t < info.as_ref().unwrap().t {
+                        info = Some(HitInfo { t, b, vertices: [v1, v2, v3] });
+                    }
+                }
+
+            }
+        }
+
+        let info = info?;
+        Some((info.t, SurfacePoint::interpolate(&info.vertices, &info.b)))
     }
 
 }
