@@ -1,5 +1,7 @@
+use std::f32::consts::PI;
+
 use float_cmp::approx_eq;
-use nalgebra::{Vector3, Point3};
+use nalgebra::{Vector3, Point3, Point2};
 
 use crate::scene::Vertex;
 
@@ -36,6 +38,15 @@ impl SurfacePoint {
 
 }
 
+pub fn uniform_hemisphere_map(p: &Point2<f32>) -> Vector3<f32> {
+    let costheta = 1.0 - 2.0 * p.x;
+    let phi = 2.0 * PI * p.y;
+
+    let sintheta = costheta.acos().sin();
+
+    Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta)
+}
+
 pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, ray: &Ray) -> Option<(f32, Vector3<f32>)> {
     let e1 = p2 - p1;
     let e2 = p3 - p2;
@@ -65,7 +76,7 @@ pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, 
         let b = Vector3::new(n2.norm(), n3.norm(), n1.norm());
         let area = b.x + b.y + b.z;
 
-        //assert!(approx_eq!(f32, n.norm(), area, ulps = 2));
+        debug_assert!(approx_eq!(f32, n.norm(), area, ulps = 2));
 
         return Some((t, b/area));
     }
@@ -147,21 +158,61 @@ mod test {
         assert!(result.is_none());
     }
 
-    // #[test]
-    // fn surface_point_interpolate() {
+    #[test]
+    fn surface_point_interpolate_flat() {
+
+        let positions = [
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        ];
+
+        let normals = [
+            Vector3::new(0.0, 0.0, 1.0),
+            Vector3::new(0.0, 0.0, 1.0),
+            Vector3::new(0.0, 0.0, 1.0),
+        ];
+
+        let tangents = [
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+        ];
+
+        let vertices = [
+            Vertex {
+                position: positions[0],
+                normal: normals[0],
+                tangent: tangents[0]
+            },
+            Vertex {
+                position: positions[1],
+                normal: normals[1],
+                tangent: tangents[1]
+            },
+            Vertex {
+                position: positions[2],
+                normal: normals[2],
+                tangent: tangents[2]
+            },
+        ];
+
+        let result = SurfacePoint::interpolate(
+            &[&vertices[0], &vertices[1], &vertices[2]],
+            &Vector3::new(0.5, 0.25, 0.25),
+        );
         
-    //     let vertices = [
-    //         Vertex
-
-    //     ];
-
-    //     let result = SurfacePoint::interpolate(
-    //         Point3::new(0.0, 0.0, 0.0),
-    //         ,
-    //         ,
-    //     );
-
-    //     assert!()
-    // }
+        assert!(approx_eq!(f32, result.position.x, 0.25, ulps = 2));
+        assert!(approx_eq!(f32, result.position.y, 0.25, ulps = 2));
+        assert!(approx_eq!(f32, result.position.z, 0.0, ulps = 2));
+        
+        assert!(approx_eq!(f32, result.normal.x, 0.0, ulps = 2));
+        assert!(approx_eq!(f32, result.normal.y, 0.0, ulps = 2));
+        assert!(approx_eq!(f32, result.normal.z, 1.0, ulps = 2));
+        
+        assert!(approx_eq!(f32, result.tangent.x, 1.0, ulps = 2));
+        assert!(approx_eq!(f32, result.tangent.y, 0.0, ulps = 2));
+        assert!(approx_eq!(f32, result.tangent.z, 0.0, ulps = 2));
+    }
 
 }

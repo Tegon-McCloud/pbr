@@ -22,10 +22,10 @@ use accelerator::Trivial;
 use integrator::{BruteForce, Integrator};
 
 
-use nalgebra::{Point3, Vector3, Vector4};
+use nalgebra::{Point3, Vector3};
 
 fn main() {    
-    let mut render_target = RenderTarget::new(512, 512, &Vector4::new(0.0, 0.0, 0.0, 1.0));
+    let mut render_target = RenderTarget::new(512, 512, &Vector3::new(0.0, 0.0, 0.0));
 
     let mut scene = Scene::from_file::<Gltf>(Path::new("resources/test.gltf")).unwrap();    
 
@@ -33,13 +33,15 @@ fn main() {
         &Point3::new(0.0, 2.0, 4.0), 
         &Point3::new(0.0, 1.0, 0.0), 
         &Vector3::new(0.0, 1.0, 0.0), 
-        PI / 2.0, 
+        PI / 2.0,
         render_target.aspect_ratio(),
     );
     
-    let integrator = BruteForce::<Trivial>::new(4, 1);
+    let integrator = BruteForce::<Trivial>::new(4, 64);
     integrator.render(scene, &mut render_target);
 
-    render_target.save(Path::new("test.png"));
+    render_target.normalize();
+
+    render_target.save("test.png");
 }
  

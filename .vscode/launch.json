@@ -25,6 +25,25 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug executable 'pbr' (release)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=pbr",
+                    "--package=pbr",
+                    "--release"
+                ],
+                "filter": {
+                    "name": "pbr",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'pbr'",
             "cargo": {
                 "args": [

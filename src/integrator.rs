@@ -1,8 +1,11 @@
-use nalgebra::{Vector3, Vector4, Matrix3};
+use std::f32::consts::PI;
+
+use nalgebra::{Vector3, Matrix3, Point2};
+use rand::Rng;
 use rayon::iter::ParallelIterator;
 
 use crate::accelerator::Accelerator;
-use crate::geometry::Ray;
+use crate::geometry::{Ray, uniform_hemisphere_map, SurfacePoint};
 use crate::render_target::RenderTarget;
 use crate::scene::Scene;
 
@@ -27,21 +30,42 @@ impl<A> BruteForce<A>
         }
     }
 
-    fn sample_radiance(&self, ray: &Ray, accel: &A) -> Vector3<f32> {
-        if let Some((_t, p)) = accel.intersect(ray) {
-            
-            let t = p.tangent;
-            let n = p.normal;
-            let b = n.cross(&t);
+    fn sample_ray(p: &SurfacePoint) -> Ray {
+        let t = p.tangent;
+        let n = p.normal;
+        let b = n.cross(&t);
 
-            let world_to_tangent = Matrix3::from_columns(&[t, b, n]).transpose_mut();
+        let t2w = Matrix3::from_columns(&[t, b, n]);
 
+        let mut rng = rand::thread_rng();
+        let u = Point2::new(rng.gen(), rng.gen());
 
+        let sample_dir = uniform_hemisphere_map(&u);
+        
+        Ray { origin: p.position + 0.0001 * p.normal, direction: t2w * sample_dir }
+    }
 
-            Vector3::new(1.0, 1.0, 1.0)
-        } else {
-            Vector3::zeros()
+    fn sample_radiance(&self, mut ray: Ray, accel: &A) -> Vector3<f32> {
+        let mut radiance = Vector3::new(0.0, 0.0, 0.0);
+        let mut throughput = Vector3::new(1.0, 1.0, 1.0);
+
+        for _ in 0..self.depth {
+            if let Some((_t, p)) = accel.intersect(&ray) {
+
+                ray = Self::sample_ray(&p);
+
+                throughput *= 1.0/PI * ray.direction.dot(&p.normal);
+            } else {
+                let light_dir = Vector3::new(1.0, 1.0, 1.0).normalize();
+                let light_col = Vector3::new(1.0, 1.0, 1.0);
+                let light_intensity = ray.direction.dot(&light_dir).max(0.0) * light_col;
+
+                radiance += light_intensity.component_mul(&throughput);
+                break;
+            }
         }
+
+        radiance
     }
 }
 
@@ -53,16 +77,18 @@ impl<A> Integrator for BruteForce<A>
         let camera = scene.camera;
         let accel = A::from_scene_node(scene.root);
 
-        target.pixels_par_mut().for_each(|(uv, px)| {
-            let mut radiance = Vector3::zeros();
+        target
+            .pixels_par_mut()
+            .for_each(|(uv, px)| {
+                let mut radiance = Vector3::zeros();
 
-            for _ in 0..self.spp {
-                let ray = camera.get_ray(&uv);
-                radiance += self.sample_radiance(&ray, &accel);
-            }
+                for _ in 0..self.spp {
+                    let ray = camera.get_ray(&uv);
+                    radiance += self.sample_radiance(ray, &accel);
+                }
 
-            radiance /= self.spp as f32;
-            *px = Vector4::new(radiance.x, radiance.y, radiance.z, 1.0);
-        });
+                radiance /= self.spp as f32;
+                *px = radiance
+            });
     }
 }
