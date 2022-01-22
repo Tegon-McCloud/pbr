@@ -62,14 +62,13 @@ impl Bvh {
         let (split_dim, _) = center_bounds.extent().argmax();
         let split_idx = triangle_order.len() / 2;
 
-        let (tris_left, tri_mid, tris_right) = triangle_order
+        triangle_order
             .select_nth_unstable_by(split_idx, |(mesh1, tri1), (mesh2, tri2)| {
                 let tri1_center = triangle_bounds[*mesh1 as usize][*tri1 as usize].center()[split_dim];
                 let tri2_center = triangle_bounds[*mesh2 as usize][*tri2 as usize].center()[split_dim];
                 tri1_center.total_cmp(&tri2_center)
             });
-
-        
+        let (tris_left, tris_right) = triangle_order.split_at_mut(split_idx);
         
         let node = BvhNode::Interior {
             bounds,
