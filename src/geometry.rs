@@ -5,20 +5,59 @@ use nalgebra::{Vector3, Point3, Point2};
 
 use crate::scene::Vertex;
 
+#[derive(Clone, Copy)]
 pub struct Ray {
     pub origin: Point3<f32>,
     pub direction: Vector3<f32>,
 }
 
+#[derive(Clone, Copy)]
 pub struct Bounds {
     pub min: Point3<f32>,
     pub max: Point3<f32>,
 }
 
+#[derive(Clone, Copy)]
 pub struct SurfacePoint {
     pub position: Point3<f32>,
     pub normal: Vector3<f32>,
     pub tangent: Vector3<f32>,
+}
+
+impl Bounds {
+
+    pub fn empty() -> Bounds {
+        Bounds { 
+            min: Point3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY), 
+            max: Point3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY),
+        }
+    }
+
+    pub fn around_points<I: IntoIterator<Item = Point3<f32>>>(points: I) -> Bounds {
+        let mut result = Self::empty();
+        for p in points {
+            result.min = p.inf(&result.min);
+            result.max = p.sup(&result.max);
+        }
+        result
+    }
+
+    pub fn around_bounds<I: IntoIterator<Item = Bounds>>(bounds: I) -> Bounds {
+        let mut result = Self::empty();
+        for b in bounds {
+            result.min = b.min.inf(&result.min);
+            result.max = b.max.sup(&result.max);
+        }
+        result
+    }
+
+    pub fn extent(&self) -> Vector3<f32> {
+        self.max - self.min
+    }
+
+    pub fn center(&self) -> Point3<f32> {
+        nalgebra::center(&self.min, &self.max)
+    }
 }
 
 impl SurfacePoint {
@@ -39,12 +78,23 @@ impl SurfacePoint {
 }
 
 pub fn uniform_hemisphere_map(p: &Point2<f32>) -> Vector3<f32> {
-    let costheta = 1.0 - 2.0 * p.x;
+    let costheta = p.x;
     let phi = 2.0 * PI * p.y;
 
     let sintheta = costheta.acos().sin();
 
     Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta)
+}
+
+
+pub fn cosine_hemisphere_map(p: &Point2<f32>) -> Vector3<f32> {
+    let phi = 2.0 * PI * p.y;
+    let r = p.x.sqrt();
+
+    let x = r * phi.cos();
+    let y = r * phi.sin();
+    
+    Vector3::new(x,y, (1.0 - p.x).sqrt())
 }
 
 pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, ray: &Ray) -> Option<(f32, Vector3<f32>)> {

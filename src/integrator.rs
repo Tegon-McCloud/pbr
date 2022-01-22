@@ -5,7 +5,7 @@ use rand::Rng;
 use rayon::iter::ParallelIterator;
 
 use crate::accelerator::Accelerator;
-use crate::geometry::{Ray, uniform_hemisphere_map, SurfacePoint};
+use crate::geometry::{Ray, uniform_hemisphere_map, cosine_hemisphere_map, SurfacePoint};
 use crate::render_target::RenderTarget;
 use crate::scene::Scene;
 
@@ -40,27 +40,26 @@ impl<A> BruteForce<A>
         let mut rng = rand::thread_rng();
         let u = Point2::new(rng.gen(), rng.gen());
 
-        let sample_dir = uniform_hemisphere_map(&u);
-        
-        Ray { origin: p.position + 0.0001 * p.normal, direction: t2w * sample_dir }
+        let sample_dir_t = cosine_hemisphere_map(&u);
+        let sample_dir_w = t2w * sample_dir_t;
+
+        //assert!(sample_dir_w.dot(&p.normal) >= 0.0);
+
+        Ray { origin: p.position + 0.0001 * p.normal, direction: sample_dir_w }
     }
 
     fn sample_radiance(&self, mut ray: Ray, accel: &A) -> Vector3<f32> {
         let mut radiance = Vector3::new(0.0, 0.0, 0.0);
-        let mut throughput = Vector3::new(1.0, 1.0, 1.0);
 
         for _ in 0..self.depth {
             if let Some((_t, p)) = accel.intersect(&ray) {
-
                 ray = Self::sample_ray(&p);
-
-                throughput *= 1.0/PI * ray.direction.dot(&p.normal);
             } else {
                 let light_dir = Vector3::new(1.0, 1.0, 1.0).normalize();
                 let light_col = Vector3::new(1.0, 1.0, 1.0);
                 let light_intensity = ray.direction.dot(&light_dir).max(0.0) * light_col;
 
-                radiance += light_intensity.component_mul(&throughput);
+                radiance += light_intensity;
                 break;
             }
         }
