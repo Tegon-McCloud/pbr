@@ -1,10 +1,8 @@
 use std::path::Path;
-use std::io::Cursor;
 
 use nalgebra::{Vector3, Point2, clamp};
-
 use rayon::prelude::*;
-use image::{io::Reader as ImageReader, RgbaImage};
+use image::{RgbaImage};
 
 pub struct RenderTarget {
     dimensions: (u32, u32),
@@ -39,17 +37,17 @@ impl RenderTarget {
             })
     }
 
-    pub fn normalize(&mut self) {
-        let max = self.buffer
-            .iter()
-            .map(|px| px.max())
-            .max_by(|p1, p2| p1.total_cmp(&p2))
-            .unwrap_or(1.0);
+    // pub fn normalize(&mut self) {
+    //     let max = self.buffer
+    //         .iter()
+    //         .map(|px| px.max())
+    //         .max_by(|p1, p2| p1.total_cmp(&p2))
+    //         .unwrap_or(1.0);
 
-        self.buffer
-            .par_iter_mut()
-            .for_each(|px| *px = *px / max);
-    }
+    //     self.buffer
+    //         .par_iter_mut()
+    //         .for_each(|px| *px = *px / max);
+    // }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) {
 

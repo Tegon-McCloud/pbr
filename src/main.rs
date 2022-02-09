@@ -1,4 +1,5 @@
 #![feature(total_cmp)]
+#![allow(dead_code)]
 
 extern crate nalgebra;
 extern crate gltf;
@@ -19,7 +20,7 @@ use scene::Scene;
 use camera::Camera;
 use render_target::RenderTarget;
 use accelerator::*;
-use integrator::{BruteForce, Integrator};
+use integrator::{BruteForcer, Integrator};
 
 
 use nalgebra::{Point3, Vector3};
@@ -29,20 +30,19 @@ fn main() {
 
     let mut scene = Scene::from_file::<Gltf>(Path::new("resources/test.gltf")).unwrap();    
 
-    Bvh::from_scene_node(scene.root);
-    // scene.camera = Camera::perspective_look_at(
-    //     &Point3::new(0.0, 2.0, 4.0), 
-    //     &Point3::new(0.0, 1.0, 0.0), 
-    //     &Vector3::new(0.0, 1.0, 0.0), 
-    //     PI / 2.0,
-    //     render_target.aspect_ratio(),
-    // );
+    scene.camera = Camera::perspective_look_at(
+        &Point3::new(0.0, 2.0, 4.0), 
+        &Point3::new(0.0, 1.0, 0.0), 
+        &Vector3::new(0.0, 1.0, 0.0), 
+        PI / 2.0,
+        render_target.aspect_ratio(),
+    );
     
-    // let integrator = BruteForce::<Trivial>::new(4, 512);
-    // integrator.render(scene, &mut render_target);
+    let integrator = BruteForcer::<Bvh>::new(4, 512);
+    integrator.render(scene, &mut render_target);
 
-    // //render_target.normalize();
+    //render_target.normalize();
 
-    // render_target.save("test.png");
+    render_target.save("test.png");
 }
  

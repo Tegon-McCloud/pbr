@@ -55,8 +55,31 @@ impl Bounds {
         self.max - self.min
     }
 
+    pub fn contains_point(&self, p: &Point3<f32>) ->  bool {
+        self.min.x <= p.x && p.x <= self.max.x &&
+        self.min.y <= p.y && p.y <= self.max.y &&
+        self.min.z <= p.z && p.z <= self.max.z
+    }
+
     pub fn center(&self) -> Point3<f32> {
         nalgebra::center(&self.min, &self.max)
+    }
+
+    pub fn does_intersect(&self, ray: &Ray) -> Option<(f32, f32)> {
+        let inv_dir = Vector3::new(1.0, 1.0, 1.0).component_div(&ray.direction);
+        let tmins_xyz = (self.min - ray.origin).component_mul(&inv_dir);
+        let tmaxs_xyz = (self.max - ray.origin).component_mul(&inv_dir);
+
+        let (tmins, tmaxs) = tmins_xyz.inf_sup(&tmaxs_xyz);
+        let interval = (tmins.max(), tmaxs.min());
+        
+        if interval.0 <= interval.1 && interval.1 >= 0.0 {
+            debug_assert!((interval.0 <= 0.0 && interval.1 >= 0.0) == self.contains_point(&ray.origin));
+            
+            Some(interval)
+        } else {
+            None
+        }
     }
 }
 
@@ -132,6 +155,10 @@ pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, 
     }
 
     None
+}
+
+pub fn triangle_centroid(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>) -> Point3<f32> {
+    Point3::from((1.0 / 3.0) * (p1.coords + p2.coords + p3.coords))
 }
 
 #[cfg(test)]
@@ -264,5 +291,47 @@ mod test {
         assert!(approx_eq!(f32, result.tangent.y, 0.0, ulps = 2));
         assert!(approx_eq!(f32, result.tangent.z, 0.0, ulps = 2));
     }
+
+    #[test]
+    fn bounds_does_intersect_hit_front() {
+        let bounds = Bounds::around_points([
+            Point3::new(1.0, 1.0, 1.0),
+            Point3::new(2.0, 2.0, 2.0),
+        ]);
+        
+        let ray = Ray {
+            origin: Point3::new(0.0, 0.0, 0.0),
+            direction: Vector3::new(1.0, 1.0, 1.0).normalize(),
+        };
+
+        let result = bounds.does_intersect(&ray);
+        assert!(result.is_some());
+        
+        let (tmin, tmax) = result.unwrap();
+        assert!(approx_eq!(f32, tmin, f32::sqrt(3.0), ulps = 2));
+        assert!(approx_eq!(f32, tmax, f32::sqrt(12.0), ulps = 2));
+    }
+
+    #[test]
+    fn bounds_does_intersect_hit_back() {
+        let bounds = Bounds::around_points([
+            Point3::new(1.0, 1.0, 1.0),
+            Point3::new(2.0, 2.0, 2.0),
+        ]);
+        
+        let ray = Ray {
+            origin: Point3::new(3.0, 3.0, 3.0),
+            direction: Vector3::new(-1.0, -1.0, -1.0).normalize(),
+        };
+
+        let result = bounds.does_intersect(&ray);
+        assert!(result.is_some());
+        
+        let (tmin, tmax) = result.unwrap();
+        assert!(approx_eq!(f32, tmin, f32::sqrt(3.0), ulps = 2));
+        assert!(approx_eq!(f32, tmax, f32::sqrt(12.0), ulps = 2));
+    }
+
+
 
 }

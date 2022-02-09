@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'pbr'",
+            "name": "Debug",
             "cargo": {
                 "args": [
                     "build",
@@ -25,7 +25,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'pbr' (release)",
+            "name": "Release",
             "cargo": {
                 "args": [
                     "build",
@@ -39,12 +39,15 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'pbr'",
+            "name": "Unit tests",
             "cargo": {
                 "args": [
                     "test",
