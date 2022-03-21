@@ -54,19 +54,6 @@ impl<T> Texture<T> where
                 (uv, px)
             })
     }
-
-    // pub fn normalize(&mut self) {
-    //     let max = self.buffer
-    //         .iter()
-    //         .map(|px| px.max())
-    //         .max_by(|p1, p2| p1.total_cmp(&p2))
-    //         .unwrap_or(1.0);
-
-    //     self.buffer
-    //         .par_iter_mut()
-    //         .for_each(|px| *px = *px / max);
-    // }
-
 }
 
 impl<T> Texture<T> where
@@ -103,6 +90,21 @@ impl Texture<Vector3<f32>> {
             .collect_vec();
         
         Texture { size, data }
+    }
+
+    pub fn from_rgb(width: u32, height: u32, data: &[u8]) -> Self {
+
+        let px_elements = data.len() / (width as usize * height as usize);
+        assert!(px_elements >= 3);
+        
+        let data = data.chunks(px_elements)
+            .map(|px| Vector3::new(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0 )
+            .collect_vec();
+
+        Self {
+            size: (width, height),
+            data: data,
+        }
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) {

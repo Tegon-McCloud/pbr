@@ -314,7 +314,7 @@ mod test {
             },
         ];
 
-        let material: Box<dyn Material> = Box::new(LambertianMaterial::flat(Vector3::zeros()));
+        let material: Box<dyn Material> = Box::new(LambertianMaterial::flat(&Vector3::zeros()));
 
         let result = SurfacePoint::interpolate(
             &[&vertices[0], &vertices[1], &vertices[2]],

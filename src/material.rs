@@ -15,9 +15,9 @@ pub struct LambertianMaterial {
 }
 
 impl LambertianMaterial {
-    pub fn flat(color: Vector3<f32>) -> Self {
+    pub fn flat(color: &Vector3<f32>) -> Self {
         Self {
-            color,
+            color: *color,
             texture: None
         }
     }
@@ -25,6 +25,13 @@ impl LambertianMaterial {
     pub fn textured(texture: Texture<Vector3<f32>>) -> Self {
         Self {
             color: Vector3::from_element(FRAC_1_PI),
+            texture: Some(texture),
+        }
+    }
+
+    pub fn textured_with_factor(factor: &Vector3<f32>, texture: Texture<Vector3<f32>>) -> Self {
+        Self {
+            color: factor * FRAC_1_PI,
             texture: Some(texture),
         }
     }

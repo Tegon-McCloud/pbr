@@ -30,7 +30,7 @@ use texture::Texture;
 
 fn main() {
 
-    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/test.gltf")).unwrap();
+    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/textured.gltf")).unwrap();
 
     let mut render_target = RenderTarget::new(1024, 512, &Vector3::new(0.0, 0.0, 0.0));
 

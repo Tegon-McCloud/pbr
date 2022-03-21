@@ -1,12 +1,11 @@
 
 pub use gltf::Gltf;
 pub use gltf::Glb;
+
 use itertools::izip;
 use nalgebra::Point2;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
-use rand::Rng;
-use rand::thread_rng;
 
 use std::io::Read;
 use std::io::Seek;
@@ -15,13 +14,16 @@ use std::io::{Result, Error, ErrorKind};
 
 use super::Loader;
 use crate::material::LambertianMaterial;
+use crate::material::Material;
 use crate::scene::{SceneBuilder, Node, Mesh, Vertex};
+use crate::texture::Texture;
 
 use nalgebra::{Point3, Matrix4, Quaternion, convert, try_convert, Translation3, UnitQuaternion, Scale3, Affine3};
 struct GltfData(Vec<gltf::buffer::Data>, Vec<gltf::image::Data>);
 
 impl Loader for Gltf {
     fn load_from_file(path: &Path) -> Result<SceneBuilder> {
+
         let (document, buffers, images) = gltf::import(path).map_err(|_| Error::from(ErrorKind::InvalidData))?;
         let data = GltfData(buffers, images);
 
@@ -93,9 +95,30 @@ fn make_mesh(gltf_prim: gltf::Primitive, data: &GltfData) -> Mesh {
         })
         .collect();
 
-    let mut rng = thread_rng();
-    let material = Box::new(LambertianMaterial::flat(Vector3::new(rng.gen(), rng.gen(), rng.gen())));
-
+    let material = make_material(gltf_prim.material(), data);
+    //let material = Box::new(LambertianMaterial::flat(&Vector3::from_element(1.0)));
     Mesh { indices, vertices, material }
 }
 
+fn make_material(gltf_material: gltf::Material, data: &GltfData) -> Box<dyn Material> {
+
+    let pmr = gltf_material.pbr_metallic_roughness();
+
+    let base_color_factor = Vector4::from(pmr.base_color_factor()).xyz();
+
+    let material;
+
+    if let Some(base_color_texture) = pmr.base_color_texture() {
+        let base_color_texture = make_texture(base_color_texture.texture(), data);
+        material = Box::new(LambertianMaterial::textured_with_factor(&base_color_factor, base_color_texture));
+    } else {
+        material = Box::new(LambertianMaterial::flat(&base_color_factor));
+    }
+
+    material
+}
+
+fn make_texture(gtlf_texture: gltf::Texture, data: &GltfData) -> Texture<Vector3<f32>> {
+    let img_data = &data.1[gtlf_texture.source().index()];
+    Texture::from_rgb(img_data.width, img_data.height, &img_data.pixels)
+}
