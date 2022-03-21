@@ -1,27 +1,24 @@
-use itertools::izip;
-use nalgebra::Vector3;
 
-use crate::scene::{Node, Vertex};
+use itertools::izip;
+use crate::scene::Vertex;
 use crate::material::{Material};
-use crate::geometry::{Ray, SurfacePoint, triangle_intersect};
-use super::Accelerator;
+use crate::geometry::{Ray, triangle_intersect};
+use super::{Accelerator, HitInfo};
 
 pub struct Trivial {
-    materials: Vec<Material>,
+    materials: Vec<Box<dyn Material>>,
     vertices: Vec<Vec<Vertex>>,
     triangles: Vec<Vec<[u32; 3]>>,
 }
 
 impl Accelerator for Trivial {
-
-    fn from_scene_node(node: Node) -> Self {
-        let meshes = node.flatten();
-
+    
+    fn build(meshes: Vec<(Vec<Vertex>, Vec<u32>)>) -> Self {
         let (vertices, triangles) = meshes
             .into_iter()
-            .map(|mesh| (
-                mesh.vertices,
-                mesh.indices
+            .map(|(vertices, indices)| (
+                vertices,
+                indices
                     .chunks(3)
                     .map(|idxs| [idxs[0], idxs[1], idxs[2]])
                     .collect()
@@ -35,36 +32,29 @@ impl Accelerator for Trivial {
         }
     }
     
-    fn intersect(&self, ray: &Ray) -> Option<(f32, SurfacePoint)> {
-
-        struct HitInfo<'a> {
-            t: f32,
-            b: Vector3<f32>,
-            vertices: [&'a Vertex; 3],
-        }
+    fn intersect(&self, ray: &Ray) -> Option<HitInfo> {
 
         let mut info: Option<HitInfo> = None;
-        
-        for (triangles, vertices) in izip!(self.triangles.iter(), self.vertices.iter()) {
+
+        for (mesh, (triangles, vertices)) in izip!(self.triangles.iter(), self.vertices.iter()).enumerate() {
             for triangle in triangles.iter() {
 
                 let v1 = &vertices[triangle[0] as usize];
                 let v2 = &vertices[triangle[1] as usize];
                 let v3 = &vertices[triangle[2] as usize];
 
-                if let Some((t, b)) = 
-                    triangle_intersect(&v1.position, &v2.position,&v3.position, ray) {
-                    
+                let hit_test = triangle_intersect(&v1.position, &v2.position,&v3.position, ray);
+
+                if let Some((t, barycentrics)) = hit_test {
                     if info.is_none() || t < info.as_ref().unwrap().t {
-                        info = Some(HitInfo { t, b, vertices: [v1, v2, v3] });
+                        info = Some(HitInfo { t, vertices: [v1, v2, v3], barycentrics, mesh: mesh as u32 });
                     }
                 }
 
             }
-        }
+        }   
 
-        let info = info?;
-        Some((info.t, SurfacePoint::interpolate(&info.vertices, &info.b)))
+        info
     }
 
 }

@@ -1,12 +1,13 @@
 
-use nalgebra::{Vector3, Point3};
+use itertools::Itertools;
+use nalgebra::Point3;
 
 use crate::{
-    geometry::{Ray, SurfacePoint, Bounds, triangle_intersect, triangle_centroid},
-    scene::{Node, Vertex, Mesh}
+    geometry::{Ray, Bounds, triangle_intersect, triangle_centroid},
+    scene::Vertex,
 };
 
-use super::Accelerator;
+use super::{Accelerator, HitInfo};
 
 enum BvhNode {
     Interior {
@@ -20,6 +21,11 @@ enum BvhNode {
     },
 }
 
+#[derive(Clone, Copy)]
+pub struct Triangle {
+    pub mesh: u32,
+    pub indices: [u32; 3],
+}
 
 pub struct Bvh {
     root: u32,
@@ -27,15 +33,9 @@ pub struct Bvh {
     vertices: Vec<Vec<Vertex>>,
 }
 
-#[derive(Clone, Copy)]
-struct Triangle {
-    pub mesh: u32,
-    pub indices: [u32; 3],
-}
-
 impl Bvh {
     fn split_recursive(
-        meshes: &[Mesh],
+        meshes: &[(Vec<Vertex>, Vec<u32>)],
         tri_bounds: &[Vec<Bounds>],
         tri_centers: &[Vec<Point3<f32>>],
         tri_order: &mut [(u32, u32)],
@@ -43,17 +43,17 @@ impl Bvh {
     ) -> (usize, Bounds) {
 
         if tri_order.len() == 1 {
-            let (mesh_idx, tri_idx) = tri_order[0];
-            let mesh = &meshes[mesh_idx as usize];
+            let (mesh, tri) = tri_order[0];
+            let (_, indices) = &meshes[mesh as usize];
             let triangle = Triangle {
-                mesh: mesh_idx,
+                mesh: mesh,
                 indices: [
-                    mesh.indices[3 * tri_idx as usize + 0],
-                    mesh.indices[3 * tri_idx as usize + 1],
-                    mesh.indices[3 * tri_idx as usize + 2]
+                    indices[3 * tri as usize + 0],
+                    indices[3 * tri as usize + 1],
+                    indices[3 * tri as usize + 2]
                 ],
             };
-            let bounds = tri_bounds[mesh_idx as usize][tri_idx as usize];
+            let bounds = tri_bounds[mesh as usize][tri as usize];
 
             nodes.push(BvhNode::Leaf { bounds, triangle });
             return (nodes.len() - 1, bounds);
@@ -88,7 +88,7 @@ impl Bvh {
         (nodes.len() - 1, bounds)
     }
     
-    fn intersect_recursive(&self, ray: &Ray, node_idx: u32, hit: &mut Option<(f32, Triangle, Vector3<f32>)>) {
+    fn intersect_recursive<'s>(&'s self, ray: &Ray, node_idx: u32, hit: &mut Option<HitInfo<'s>>) {
 
         match &self.nodes[node_idx as usize] {
             BvhNode::Interior{ bounds, left, right } => {
@@ -104,11 +104,11 @@ impl Bvh {
                     let v2 = &self.vertices[tri.mesh as usize][tri.indices[1] as usize];
                     let v3 = &self.vertices[tri.mesh as usize][tri.indices[2] as usize];
                     
-                    let newhit = triangle_intersect(&v1.position, &v2.position, &v3.position, ray);
+                    let new_hit = triangle_intersect(&v1.position, &v2.position, &v3.position, ray);
 
-                    if let Some((t, b)) = newhit {
-                        if hit.is_none() || t < hit.as_ref().unwrap().0 {
-                            *hit = Some((t, *tri, b));
+                    if let Some((t, barycentrics)) = new_hit {
+                        if hit.is_none() || t < hit.as_ref().unwrap().t {
+                            *hit = Some(HitInfo { t, vertices: [v1, v2, v3], barycentrics, mesh: tri.mesh });
                         }
                     }
 
@@ -120,18 +120,15 @@ impl Bvh {
 }
 
 impl Accelerator for Bvh {
-    fn from_scene_node(node: Node) -> Self {
-        let meshes = node.flatten();
-
-        let tri_bounds = meshes
-            .iter()
-            .map(|mesh| mesh.indices
+    fn build(meshes: Vec<(Vec<Vertex>, Vec<u32>)>) -> Self {
+        let tri_bounds = meshes.iter()
+            .map(|(vertices, indices)| indices 
                 .chunks(3)
                 .map(|idxs|
                     Bounds::around_points([
-                        mesh.vertices[idxs[0] as usize].position,
-                        mesh.vertices[idxs[1] as usize].position,
-                        mesh.vertices[idxs[2] as usize].position,
+                        vertices[idxs[0] as usize].position,
+                        vertices[idxs[1] as usize].position,
+                        vertices[idxs[2] as usize].position,
                     ])
                 )
                 .collect::<Vec<_>>()
@@ -140,49 +137,43 @@ impl Accelerator for Bvh {
 
         let tri_centers = meshes
             .iter()
-            .map(|mesh| mesh.indices
+            .map(|(vertices, indices)| indices
                 .chunks(3)
                 .map(|idxs|
                     triangle_centroid(
-                        &mesh.vertices[idxs[0] as usize].position,
-                        &mesh.vertices[idxs[0] as usize].position,
-                        &mesh.vertices[idxs[0] as usize].position,
+                        &vertices[idxs[0] as usize].position,
+                        &vertices[idxs[0] as usize].position,
+                        &vertices[idxs[0] as usize].position,
                     )
                 )
-                .collect::<Vec<_>>()
+                .collect_vec()
             )
-            .collect::<Vec<_>>();
+            .collect_vec();
         
         let mut tri_order = meshes
             .iter()
             .enumerate()
-            .map(|(mesh_idx, mesh)| (0..mesh.indices.len() / 3)
-                .map(move |tri_idx| (mesh_idx as u32, tri_idx as u32))
+            .map(|(mesh, (_, indices))| (0..indices.len() / 3)
+                .map(move |tri| (mesh as u32, tri as u32))
             )
             .flatten()
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         let mut nodes = Vec::new();
         let (root, _) = Self::split_recursive(&meshes, &tri_bounds, &tri_centers, &mut tri_order, &mut nodes);
 
         let vertices = meshes
             .into_iter()
-            .map(|mesh| mesh.vertices)
-            .collect::<Vec<_>>();
+            .map(|(vertices, _)| vertices)
+            .collect_vec();
         
         Self { root: root as u32, nodes, vertices }
+
     }
 
-    fn intersect(&self, ray: &Ray) -> Option<(f32, SurfacePoint)> {
-        let mut hit = None;
-        self.intersect_recursive(ray, self.root, &mut hit);
-        hit.map(|(t, tri, b)| {
-            let vertices = &self.vertices[tri.mesh as usize];
-            let v1 = &vertices[tri.indices[0] as usize];
-            let v2 = &vertices[tri.indices[1] as usize];
-            let v3 = &vertices[tri.indices[2] as usize];
-
-            (t, SurfacePoint::interpolate(&[v1, v2, v3], &b))
-        })
+    fn intersect(&self, ray: &Ray) -> Option<HitInfo> {
+        let mut info = None;
+        self.intersect_recursive(ray, self.root, &mut info);
+        info
     }
 }

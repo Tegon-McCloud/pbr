@@ -1,84 +1,86 @@
-use nalgebra::{Vector3, Matrix3, Point2};
-use rand::Rng;
+use std::f32::consts::PI;
+
+use nalgebra::{Vector3, Point2};
+use rand::{Rng, thread_rng};
 use rayon::iter::ParallelIterator;
 
 use crate::accelerator::Accelerator;
-use crate::geometry::{Ray, cosine_hemisphere_map, SurfacePoint};
+use crate::geometry::{Ray, cosine_hemisphere_map};
+use crate::light::Emitter;
 use crate::scene::Scene;
-use crate::render_target::RenderTarget;
+use crate::texture::RenderTarget;
 use super::Integrator;
 
-pub struct BruteForcer<A> {
+pub struct BruteForcer {
     depth: u32,
     spp: u32,
-    phantom: std::marker::PhantomData<A>,
 }
 
-impl<A> BruteForcer<A> 
-    where A: Accelerator
+impl BruteForcer
 {
-    pub fn new(depth: u32, spp: u32) -> BruteForcer<A> {
+    pub fn new(depth: u32, spp: u32) -> BruteForcer {
         BruteForcer {
             depth,
             spp,
-            phantom: std::marker::PhantomData,
         }
     }
 
-    fn sample_ray(p: &SurfacePoint) -> Ray {
-        let t = p.tangent;
-        let n = p.normal;
-        let b = n.cross(&t);
-
-        let t2w = Matrix3::from_columns(&[t, b, n]);
-
-        let mut rng = rand::thread_rng();
-        let u = Point2::new(rng.gen(), rng.gen());
-
-        let sample_dir_t = cosine_hemisphere_map(&u);
-        let sample_dir_w = t2w * sample_dir_t;
-
-        debug_assert!(sample_dir_w.dot(&p.normal) >= 0.0);
-
-        Ray { origin: p.position + 0.0001 * p.normal, direction: sample_dir_w }
-    }
-
-    fn sample_radiance(&self, mut ray: Ray, accel: &A) -> Vector3<f32> {
-        let mut radiance = Vector3::new(0.0, 0.0, 0.0);
+    fn sample_recursive<A: Accelerator>(&self, ray: Ray, scene: &Scene<A>, depth: u32) -> Vector3<f32> {
+        if depth == self.depth {
+            return Vector3::from_element(0.0);
+        }
         
-        for _ in 0..self.depth {
-            if let Some((_t, p)) = accel.intersect(&ray) {
-                ray = Self::sample_ray(&p);
-            } else {
-                let light_dir = Vector3::new(1.0, 1.0, 1.0).normalize();
-                let light_col = Vector3::new(1.0, 1.0, 1.0);
-                let light_intensity = ray.direction.dot(&light_dir).max(0.0) * light_col;
+        if let Some(p) = scene.intersect(&ray) {
+            let t2w = p.tangent_to_world();
+            let w2t = t2w.transpose();
 
-                radiance += light_intensity;
-                break;
+            let wo = w2t * ray.direction;
+
+            let mut rng = thread_rng();
+            let u = Point2::new(rng.gen(), rng.gen());
+            let wi = cosine_hemisphere_map(&u);
+            let sample_pdf = wi.z / PI;
+            let sample_dir = t2w * wi;
+
+            let next_ray = Ray {
+                origin: p.position + 0.0001 * p.normal,
+                direction: sample_dir,
+            };
+
+            let brdf = p.brdf(&wi, &wo);
+
+            let sample_radiance = self.sample_recursive(next_ray, scene, depth+1);
+
+            return brdf.component_mul(&sample_radiance) * wi.z / sample_pdf;
+        } else {
+            let mut radiance = Vector3::from_element(0.0);
+
+            for bg_light in scene.background_lights() {
+                radiance += bg_light.emission(&ray.direction);
             }
-        }
 
-        radiance
+            return radiance;
+        }
+        
+    }
+
+    fn sample_radiance<A: Accelerator>(&self, ray: Ray, scene: &Scene<A>) -> Vector3<f32> {
+        self.sample_recursive(ray, scene, 0)
     }
 }
 
-impl<A> Integrator for BruteForcer<A> 
-    where A: Accelerator + std::marker::Sync
+impl Integrator for BruteForcer
 {   
-    fn render(&self, scene: Scene, target: &mut RenderTarget) {
+    fn render<A: Accelerator>(&self, scene: &Scene<A>, target: &mut RenderTarget) {
         
-        let camera = scene.camera;
-        let accel = A::from_scene_node(scene.root);
-
         target
             .pixels_par_mut()
             .for_each(|(uv, px)| {
                 let mut radiance = Vector3::zeros();
 
                 for _ in 0..self.spp {
-                    let ray = camera.get_ray(&uv);
-                    radiance += self.sample_radiance(ray, &accel);
+                    let ray = scene.camera.get_ray(&uv);
+                    radiance += self.sample_radiance(ray, scene);
                 }
 
                 radiance /= self.spp as f32;

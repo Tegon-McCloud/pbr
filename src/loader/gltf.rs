@@ -2,8 +2,11 @@
 pub use gltf::Gltf;
 pub use gltf::Glb;
 use itertools::izip;
+use nalgebra::Point2;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
+use rand::Rng;
+use rand::thread_rng;
 
 use std::io::Read;
 use std::io::Seek;
@@ -11,13 +14,14 @@ use std::path::Path;
 use std::io::{Result, Error, ErrorKind};
 
 use super::Loader;
-use crate::scene::{Scene, Node, Mesh, Vertex};
+use crate::material::LambertianMaterial;
+use crate::scene::{SceneBuilder, Node, Mesh, Vertex};
 
 use nalgebra::{Point3, Matrix4, Quaternion, convert, try_convert, Translation3, UnitQuaternion, Scale3, Affine3};
 struct GltfData(Vec<gltf::buffer::Data>, Vec<gltf::image::Data>);
 
 impl Loader for Gltf {
-    fn load_from_file(path: &Path) -> Result<Scene> {
+    fn load_from_file(path: &Path) -> Result<SceneBuilder> {
         let (document, buffers, images) = gltf::import(path).map_err(|_| Error::from(ErrorKind::InvalidData))?;
         let data = GltfData(buffers, images);
 
@@ -29,10 +33,10 @@ impl Loader for Gltf {
 
         let root = Node { children, ..Default::default() };
 
-        Ok(Scene { root, ..Default::default() })
+        Ok(SceneBuilder { root, ..Default::default() })
     }
 
-    fn load_from_reader<R: Read + Seek>(_rdr: &mut R) -> Result<Scene> {
+    fn load_from_reader<R: Read + Seek>(_rdr: &mut R) -> Result<SceneBuilder> {
         unimplemented!()
     }
 }
@@ -78,15 +82,20 @@ fn make_mesh(gltf_prim: gltf::Primitive, data: &GltfData) -> Mesh {
     let vertices = izip!(
         reader.read_positions().unwrap(),
         reader.read_normals().unwrap(),
-        reader.read_tangents().unwrap()
+        reader.read_tangents().unwrap(),
+        reader.read_tex_coords(0).unwrap().into_f32(),
     )
-        .map(|(p, n, t)| Vertex {
+        .map(|(p, n, t, uv)| Vertex {
             position: Point3::from(p),
             normal: Vector3::from(n),
             tangent: Vector4::from(t).xyz() * t[3],
+            tex_coords: Point2::from(uv),
         })
         .collect();
 
-    Mesh { indices, vertices, }
+    let mut rng = thread_rng();
+    let material = Box::new(LambertianMaterial::flat(Vector3::new(rng.gen(), rng.gen(), rng.gen())));
+
+    Mesh { indices, vertices, material }
 }
 

@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 
 use float_cmp::approx_eq;
-use nalgebra::{Vector3, Point3, Point2};
+use nalgebra::{Vector3, Point3, Point2, Matrix3};
 
-use crate::scene::Vertex;
+use crate::{scene::Vertex, material::Material};
 
 #[derive(Clone, Copy)]
 pub struct Ray {
@@ -11,18 +11,62 @@ pub struct Ray {
     pub direction: Vector3<f32>,
 }
 
+
+#[derive(Clone, Copy)]
+pub struct SurfacePoint<'s> {
+    pub position: Point3<f32>,
+    pub normal: Vector3<f32>,
+    pub tangent: Vector3<f32>,
+    pub tex_coords: Point2<f32>,
+    pub material: &'s dyn Material,
+}
+
+impl<'s> SurfacePoint<'s> {
+    pub fn interpolate(vertices: &[&Vertex; 3], barycentrics: &Vector3<f32>, material: &'s dyn Material) -> SurfacePoint<'s> {
+        let b = barycentrics;
+        let [v1, v2, v3] = vertices;
+
+        let position = Point3::from(v1.position.coords * b.x + v2.position.coords * b.y + v3.position.coords * b.z);
+        let normal = (v1.normal * b.x + v2.normal * b.y + v3.normal * b.z).normalize();
+        let tangent =  v1.tangent * b.x + v2.tangent * b.y + v3.tangent * b.z;
+        // gram-schmidt
+        let tangent = (tangent - normal * tangent.dot(&normal)).normalize();
+        
+        let tex_coords = Point2::from(v1.tex_coords.coords * b.x + v2.tex_coords.coords * b.y + v3.tex_coords.coords * b.z);
+
+        SurfacePoint { position, normal, tangent, tex_coords, material }
+    }
+
+    pub fn tangent_to_world(&self) -> Matrix3<f32> {
+        let t = self.tangent;
+        let n = self.normal;
+        let b = n.cross(&t);
+
+        Matrix3::from_columns(&[t, b, n])   
+    }
+
+    pub fn brdf(&self, wi: &Vector3<f32>, wo: &Vector3<f32>) -> Vector3<f32> {
+        self.material.brdf(&self.tex_coords, wi, wo)
+    }
+
+}
+
+pub fn uniform_hemisphere_map(p: &Point2<f32>) -> Vector3<f32> {
+    let costheta = p.x;
+    let phi = 2.0 * PI * p.y;
+
+    let sintheta = costheta.acos().sin();
+
+    Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta)
+}
+
+
 #[derive(Clone, Copy)]
 pub struct Bounds {
     pub min: Point3<f32>,
     pub max: Point3<f32>,
 }
 
-#[derive(Clone, Copy)]
-pub struct SurfacePoint {
-    pub position: Point3<f32>,
-    pub normal: Vector3<f32>,
-    pub tangent: Vector3<f32>,
-}
 
 impl Bounds {
 
@@ -83,25 +127,8 @@ impl Bounds {
     }
 }
 
-impl SurfacePoint {
-    pub fn interpolate(vertices: &[&Vertex; 3], barycentrics: &Vector3<f32>) -> SurfacePoint {
-        let b = barycentrics;
-        let [v1, v2, v3] = vertices;
-        
-
-        let position = Point3::from(v1.position.coords * b.x + v2.position.coords * b.y + v3.position.coords * b.z);
-        let normal = (v1.normal * b.x + v2.normal * b.y + v3.normal * b.z).normalize();
-        let tangent =  v1.tangent * b.x + v2.tangent * b.y + v3.tangent * b.z;
-        // gram-schmidt
-        let tangent = (tangent - normal * tangent.dot(&normal)).normalize();
-
-        SurfacePoint { position, normal, tangent }
-    }
-
-}
-
-pub fn uniform_hemisphere_map(p: &Point2<f32>) -> Vector3<f32> {
-    let costheta = p.x;
+pub fn uniform_sphere_map(p: &Point2<f32>) -> Vector3<f32> {
+    let costheta = 2.0 * p.x - 1.0;
     let phi = 2.0 * PI * p.y;
 
     let sintheta = costheta.acos().sin();
@@ -149,7 +176,7 @@ pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, 
         let b = Vector3::new(n2.norm(), n3.norm(), n1.norm());
         let area = b.x + b.y + b.z;
 
-        debug_assert!(approx_eq!(f32, n.norm(), area, ulps = 2));
+        debug_assert!(approx_eq!(f32, n.norm(), area, ulps = 5));
 
         return Some((t, b/area));
     }
@@ -163,6 +190,10 @@ pub fn triangle_centroid(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>) -
 
 #[cfg(test)]
 mod test {
+    use std::borrow::Borrow;
+
+    use crate::material::LambertianMaterial;
+
     use super::*;
     use float_cmp::approx_eq;
 
@@ -256,27 +287,39 @@ mod test {
             Vector3::new(1.0, 0.0, 0.0),
         ];
 
+        let tex_coords = [
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(0.0, 1.0),
+        ];
+
         let vertices = [
             Vertex {
                 position: positions[0],
                 normal: normals[0],
-                tangent: tangents[0]
+                tangent: tangents[0],
+                tex_coords: tex_coords[0],
             },
             Vertex {
                 position: positions[1],
                 normal: normals[1],
-                tangent: tangents[1]
+                tangent: tangents[1],
+                tex_coords: tex_coords[1],
             },
             Vertex {
                 position: positions[2],
                 normal: normals[2],
-                tangent: tangents[2]
+                tangent: tangents[2],
+                tex_coords: tex_coords[2],
             },
         ];
+
+        let material: Box<dyn Material> = Box::new(LambertianMaterial::flat(Vector3::zeros()));
 
         let result = SurfacePoint::interpolate(
             &[&vertices[0], &vertices[1], &vertices[2]],
             &Vector3::new(0.5, 0.25, 0.25),
+            material.borrow()  
         );
         
         assert!(approx_eq!(f32, result.position.x, 0.25, ulps = 2));
