@@ -120,5 +120,14 @@ fn make_material(gltf_material: gltf::Material, data: &GltfData) -> Box<dyn Mate
 
 fn make_texture(gtlf_texture: gltf::Texture, data: &GltfData) -> Texture<Vector3<f32>> {
     let img_data = &data.1[gtlf_texture.source().index()];
-    Texture::from_rgb(img_data.width, img_data.height, &img_data.pixels)
+
+    let pixels = &img_data.pixels;
+    let width = img_data.width;
+    let height = img_data.height;
+
+    match img_data.format {
+        gltf::image::Format::R8G8B8 => Texture::from_raw_data::<u8, 3>(width, height, pixels).unwrap(),
+        gltf::image::Format::R8G8B8A8 => Texture::from_raw_data::<u8, 4>(width, height, pixels).unwrap(),
+        _ => todo!(),
+    }
 }
