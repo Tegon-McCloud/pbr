@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use float_cmp::approx_eq;
 use nalgebra::{Vector3, Point3, Point2, Matrix3};
 
-use crate::{scene::Vertex, material::Material};
+use crate::{scene::Vertex, material::{Material, BrdfSample}};
 
 #[derive(Clone, Copy)]
 pub struct Ray {
@@ -48,18 +48,12 @@ impl<'s> SurfacePoint<'s> {
     pub fn brdf(&self, wi: &Vector3<f32>, wo: &Vector3<f32>) -> Vector3<f32> {
         self.material.brdf(&self.tex_coords, wi, wo)
     }
+    
+    pub fn sample_brdf(&self, wo: &Vector3<f32>) -> BrdfSample {
+        self.material.sample_brdf(&self.tex_coords, wo)
+    }
 
 }
-
-pub fn uniform_hemisphere_map(p: &Point2<f32>) -> Vector3<f32> {
-    let costheta = p.x;
-    let phi = 2.0 * PI * p.y;
-
-    let sintheta = costheta.acos().sin();
-
-    Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta)
-}
-
 
 #[derive(Clone, Copy)]
 pub struct Bounds {
@@ -127,24 +121,32 @@ impl Bounds {
     }
 }
 
-pub fn uniform_sphere_map(p: &Point2<f32>) -> Vector3<f32> {
-    let costheta = 2.0 * p.x - 1.0;
-    let phi = 2.0 * PI * p.y;
+pub fn uniform_sphere_map(u: &Point2<f32>) -> Vector3<f32> {
+    let costheta = 2.0 * u.x - 1.0;
+    let phi = 2.0 * PI * u.y;
 
     let sintheta = costheta.acos().sin();
 
     Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta)
 }
 
+pub fn uniform_hemisphere_map(u: &Point2<f32>) -> Vector3<f32> {
+    let costheta = u.x;
+    let phi = 2.0 * PI * u.y;
 
-pub fn cosine_hemisphere_map(p: &Point2<f32>) -> Vector3<f32> {
-    let phi = 2.0 * PI * p.y;
-    let r = p.x.sqrt();
+    let sintheta = costheta.acos().sin();
+
+    Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta)
+}
+
+pub fn cosine_hemisphere_map(u: &Point2<f32>) -> Vector3<f32> {
+    let phi = 2.0 * PI * u.y;
+    let r = u.x.sqrt();
 
     let x = r * phi.cos();
     let y = r * phi.sin();
     
-    Vector3::new(x,y, (1.0 - p.x).sqrt())
+    Vector3::new(x,y, (1.0 - u.x).sqrt())
 }
 
 pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, ray: &Ray) -> Option<(f32, Vector3<f32>)> {
