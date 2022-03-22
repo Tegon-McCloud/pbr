@@ -1,11 +1,8 @@
 
-use std::f32::consts::PI;
-
-use nalgebra::{Vector3, Point2};
-use rand::Rng;
+use nalgebra::Vector3;
 use rayon::iter::ParallelIterator;
 
-use crate::{accelerator::Accelerator, geometry::{Ray, SurfacePoint, self}, scene::Scene, light::Emitter};
+use crate::{accelerator::Accelerator, geometry::{Ray, SurfacePoint}, scene::Scene, light::Emitter};
 use super::Integrator;
 
 pub struct PathTracer {
@@ -69,19 +66,14 @@ impl PathTracer
 
             let t2w = p.tangent_to_world();
             let w2t = t2w.transpose();
-            
-            let mut rng = rand::thread_rng();
-            let u = Point2::new(rng.gen(), rng.gen());
-            let wi = geometry::cosine_hemisphere_map(&u);
             let wo = w2t * ray.direction;
-            let brdf = p.brdf(&wi, &wo);
-            let pdf = wi.z / PI;
+            let sample = p.sample_brdf(&wo);
 
-            throughput = throughput.component_mul(&brdf) * wi.z / pdf;
+            throughput = throughput.component_mul(&sample.brdf) * sample.wi.z / sample.pdf;
             
             ray = Ray {
                 origin: p.position + 0.0001 * p.normal,
-                direction: t2w * wi,
+                direction: t2w * sample.wi,
             };
 
         }
