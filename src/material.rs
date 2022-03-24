@@ -1,5 +1,5 @@
 
-use std::f32::consts::FRAC_1_PI;
+use std::f32::consts::{FRAC_1_PI, PI};
 
 use nalgebra::{Vector3, Point2, Vector2};
 use rand::{thread_rng, Rng};
@@ -49,10 +49,7 @@ impl LambertianMaterial {
 
 impl Material for LambertianMaterial {
     fn brdf(&self, uv: &Point2<f32>,  _wi: &Vector3<f32>, _wo: &Vector3<f32>) -> Vector3<f32> {
-        self.color.component_mul(&self.texture
-            .as_ref()
-            .map_or(Vector3::from_element(1.0), |tex| tex.sample(uv))
-        )
+        self.color.component_mul(&self.texture.sample_or(uv, Vector3::from_element(1.0)))
     }   
 
     fn sample_brdf(&self, uv: &Point2<f32>, wo: &Vector3<f32>) -> BrdfSample {
@@ -68,7 +65,6 @@ impl Material for LambertianMaterial {
     fn is_delta(&self, _uv: &Point2<f32>) -> bool {
         false
     }
-
 }
 
 
@@ -93,12 +89,109 @@ impl GltfMaterial {
             metal_rough_texture,
         }
     }
+
+    fn base_color_at(&self, uv: &Point2<f32>) -> Vector3<f32> {
+        self.base_color_factor.component_mul(&self.base_color_texture.sample_or(uv, Vector3::from_element(1.0)))
+    }
+ 
+    fn metal_rough_at(&self, uv: &Point2<f32>) -> (f32, f32) {
+        let mr = self.metal_rough_factor.component_mul(&self.metal_rough_texture.sample_or(uv, Vector2::new(0.0, 1.0)));
+        (mr.x, mr.y)
+    }
+
+
+    fn facet_density(alpha2: f32, m: &Vector3<f32>) -> f32 {
+        let temp = (alpha2 - 1.0) * m.z * m.z + 1.0;
+        alpha2 / (PI * temp * temp)
+    }
+
+    fn sample_facet(alpha2: f32) -> (Vector3<f32>, f32) {
+        let mut rng = thread_rng();
+        let u: Point2<f32> = Point2::new(rng.gen(), rng.gen());
+
+        let costheta = ((1.0 - u.x) / (u.x * (alpha2 - 1.0) + 1.0)).sqrt();
+        let sintheta = (1.0 - costheta * costheta).sqrt();
+        let phi = 2.0 * PI * u.y;
+
+        let m = Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
+
+        let pdf = Self::facet_density(alpha2, &m) * costheta;
+
+        (m, pdf)
+    } 
+
+    fn one_way_shadowing(alpha2: f32, v: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
+        let costheta = v.dot(m);
+        let temp = alpha2 / (costheta * costheta) - alpha2;
+        
+        2.0 / (1.0 + temp.sqrt())
+    }
+
+    fn fresnel(i: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
+        const R0: f32 = 0.04;
+        R0 + (1.0 - R0) * (1.0 - i.dot(m)).powi(5)
+    }
+
+    fn shadowing(alpha2: f32, i: &Vector3<f32>, o: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
+        Self::one_way_shadowing(alpha2, i, m) * Self::one_way_shadowing(alpha2, o, m)
+    }
 }
 
-// impl Material for GltfMaterial {
 
-//     fn brdf(&self, uv: &Point2<f32>, wi: &Vector3<f32>, wo: &Vector3<f32>) -> Vector3<f32> {
+impl Material for GltfMaterial {
+
+    fn brdf(&self, uv: &Point2<f32>, i: &Vector3<f32>, o: &Vector3<f32>) -> Vector3<f32> {
+        let (_metal, rough) = self.metal_rough_at(uv);
+        let alpha = rough * rough;
+        let alpha2 = alpha * alpha;
+
+        let m = (i + o).normalize();
+
+        let d = Self::facet_density(alpha2, &m);
+        let f = Self::fresnel(i, &m);
+        let g = Self::shadowing(alpha2, i, o, &m);
+
+        let brdf = (d * g * f) / (4.0 * i.z * o.z);
+
+        Vector3::from_element(brdf)
+    }
+
+    fn sample_brdf(&self, uv: &Point2<f32>, o: &Vector3<f32>) -> BrdfSample {
         
-//     }
+        let (_metal, rough) = self.metal_rough_at(uv);
+        let alpha = rough * rough;
+        let alpha2 = alpha * alpha;
 
-// }
+        let (m, m_pdf) = Self::sample_facet(alpha2);
+
+        let mdoto = m.dot(o);
+
+        let i = -o + 2.0 * mdoto * m;
+        let pdf = m_pdf / (4.0 * mdoto);
+        let brdf = self.brdf(uv, &i, o);
+
+        BrdfSample { wi: i, brdf, pdf }
+    }
+
+    fn is_delta(&self, _uv: &Point2<f32>) -> bool {
+        false
+    }
+}
+
+trait MaybeTexture<T> {
+    fn sample_or<U>(&self, uv: &Point2<f32>, default: U) -> U where
+    U: From<T>;
+}
+
+impl<T> MaybeTexture<T> for Option<Texture<T>> where 
+    T: Copy 
+{
+    fn sample_or<U>(&self, uv: &Point2<f32>, default: U) -> U where
+        U: From<T>
+    {
+        match self {
+            Some(texture) => texture.sample(uv),
+            None => default,
+        }
+    }
+}

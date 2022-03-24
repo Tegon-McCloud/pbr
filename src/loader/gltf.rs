@@ -4,6 +4,7 @@ pub use gltf::Glb;
 
 use itertools::izip;
 use nalgebra::Point2;
+use nalgebra::Vector2;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
 
@@ -13,7 +14,7 @@ use std::path::Path;
 use std::io::{Result, Error, ErrorKind};
 
 use super::Loader;
-use crate::material::LambertianMaterial;
+use crate::material::GltfMaterial;
 use crate::material::Material;
 use crate::scene::{SceneBuilder, Node, Mesh, Vertex};
 use crate::texture::Texture;
@@ -100,20 +101,28 @@ fn make_mesh(gltf_prim: gltf::Primitive, data: &GltfData) -> Mesh {
     Mesh { indices, vertices, material }
 }
 
-fn make_material(gltf_material: gltf::Material, data: &GltfData) -> Box<dyn Material> {
+fn make_material(gltf_material: gltf::Material, _data: &GltfData) -> Box<dyn Material> {
 
     let pmr = gltf_material.pbr_metallic_roughness();
 
     let base_color_factor = Vector4::from(pmr.base_color_factor()).xyz();
 
-    let material;
+    let material = Box::new(
+        GltfMaterial::new(
+            base_color_factor,
+            Vector2::new(0.0, 0.1),
+            None,
+            None
+        )
+    );
 
-    if let Some(base_color_texture) = pmr.base_color_texture() {
-        let base_color_texture = make_texture(base_color_texture.texture(), data);
-        material = Box::new(LambertianMaterial::textured_with_factor(&base_color_factor, base_color_texture));
-    } else {
-        material = Box::new(LambertianMaterial::flat(&base_color_factor));
-    }
+    // if let Some(base_color_texture) = pmr.base_color_texture() {
+    //     let base_color_texture = make_texture(base_color_texture.texture(), data);
+
+    //     material = Box::new(GltfMaterial::textured_with_factor(&base_color_factor, base_color_texture));
+    // } else {
+    //     material = Box::new(LambertianMaterial::flat(&base_color_factor));
+    // }
 
     material
 }

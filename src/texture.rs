@@ -10,7 +10,6 @@ pub enum ColorSpace {
     Srgb,
 }
 
-
 pub struct Texture<T> {
     size: (u32, u32),
     data: Vec<T>,

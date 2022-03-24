@@ -94,7 +94,7 @@ impl<A> Scene<A> where
         let info = self.accelerator.intersect(ray);
         info.map(|info|  {
             let material = self.materials[info.mesh as usize].as_ref();
-            SurfacePoint::interpolate(&info.vertices, &info.barycentrics, material)
+            SurfacePoint::new(&info.barycentrics, &info.vertices, material)
         })
     } 
     

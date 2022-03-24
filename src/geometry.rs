@@ -22,20 +22,22 @@ pub struct SurfacePoint<'s> {
 }
 
 impl<'s> SurfacePoint<'s> {
-    pub fn interpolate(vertices: &[&Vertex; 3], barycentrics: &Vector3<f32>, material: &'s dyn Material) -> SurfacePoint<'s> {
-        let b = barycentrics;
-        let [v1, v2, v3] = vertices;
+    
 
-        let position = Point3::from(v1.position.coords * b.x + v2.position.coords * b.y + v3.position.coords * b.z);
-        let normal = (v1.normal * b.x + v2.normal * b.y + v3.normal * b.z).normalize();
-        let tangent =  v1.tangent * b.x + v2.tangent * b.y + v3.tangent * b.z;
-        // gram-schmidt
-        let tangent = (tangent - normal * tangent.dot(&normal)).normalize();
+    pub fn new(barycentrics: &Vector3<f32>, vertices: &[&Vertex; 3], material: &'s dyn Material) -> Self {
+
+        let v = interpolate(barycentrics, vertices);
         
-        let tex_coords = Point2::from(v1.tex_coords.coords * b.x + v2.tex_coords.coords * b.y + v3.tex_coords.coords * b.z);
-
-        SurfacePoint { position, normal, tangent, tex_coords, material }
+        Self {
+            position: v.position,
+            normal: v.normal,
+            tangent: v.tangent,
+            tex_coords: v.tex_coords,
+            material: material
+        }
     }
+
+
 
     pub fn tangent_to_world(&self) -> Matrix3<f32> {
         let t = self.tangent;
@@ -190,6 +192,21 @@ pub fn triangle_centroid(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>) -
     Point3::from((1.0 / 3.0) * (p1.coords + p2.coords + p3.coords))
 }
 
+pub fn interpolate(barycentrics: &Vector3<f32>, vertices: &[&Vertex; 3]) -> Vertex {
+    let b = barycentrics;
+    let [v1, v2, v3] = vertices;
+
+    let position = Point3::from(v1.position.coords * b.x + v2.position.coords * b.y + v3.position.coords * b.z);
+    let normal = (v1.normal * b.x + v2.normal * b.y + v3.normal * b.z).normalize();
+    let tangent =  v1.tangent * b.x + v2.tangent * b.y + v3.tangent * b.z;
+    // gram-schmidt
+    let tangent = (tangent - normal * tangent.dot(&normal)).normalize();
+
+    let tex_coords = Point2::from(v1.tex_coords.coords * b.x + v2.tex_coords.coords * b.y + v3.tex_coords.coords * b.z);
+
+    Vertex { position, normal, tangent, tex_coords }
+}
+
 #[cfg(test)]
 mod test {
     use std::borrow::Borrow;
@@ -318,9 +335,9 @@ mod test {
 
         let material: Box<dyn Material> = Box::new(LambertianMaterial::flat(&Vector3::zeros()));
 
-        let result = SurfacePoint::interpolate(
-            &[&vertices[0], &vertices[1], &vertices[2]],
+        let result = SurfacePoint::new(
             &Vector3::new(0.5, 0.25, 0.25),
+            &[&vertices[0], &vertices[1], &vertices[2]],
             material.borrow()  
         );
         

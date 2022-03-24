@@ -30,7 +30,7 @@ use texture::Texture;
 
 fn main() {
 
-    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/test.gltf")).unwrap();
+    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/textured.gltf")).unwrap();
 
     let mut render_target = RenderTarget::new(1024, 512, &Vector3::new(0.0, 0.0, 0.0));
 
@@ -46,19 +46,10 @@ fn main() {
         render_target.aspect_ratio(),
     );
 
-    // scene.light_sources.push(LightSource::Directional(DirectionalLight {
-    //     neg_direction: Vector3::new(1.0, 1.0, 1.0).normalize(),
-    //     irradiance: Vector3::new(1.0, 1.0, 1.0),
-    // }));
-    
-    // scene.light_sources.push(LightSource::Test(TestLight {}));
-
     let scene = scene.build::<Bvh>();
 
     let integrator = PathTracer::new(4, 512);
     integrator.render(&scene, &mut render_target);
-
-    //render_target.normalize();
 
     render_target.save("test.png");
 }
