@@ -18,6 +18,7 @@ use std::{path::Path, f32::consts::PI};
 
 
 use loader::Gltf;
+use material::GltfMaterial;
 use scene::SceneBuilder;
 use camera::Camera;
 use accelerator::*;
@@ -28,9 +29,12 @@ use texture::*;
 use nalgebra::{Point3, Vector3};
 use texture::Texture;
 
+
+
 fn main() {
 
-    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/textured.gltf")).unwrap();
+
+    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/tank.gltf")).unwrap();
 
     let mut render_target = RenderTarget::new(1024, 512, &Vector3::new(0.0, 0.0, 0.0));
 
@@ -40,7 +44,7 @@ fn main() {
 
     scene.camera = Camera::perspective_look_at(
         &Point3::new(0.0, 2.0, 4.0), 
-        &Point3::new(0.0, 1.0, 0.0), 
+        &Point3::new(0.0, 0.0, 0.0), 
         &Vector3::new(0.0, 1.0, 0.0), 
         PI / 2.0,
         render_target.aspect_ratio(),
@@ -48,7 +52,7 @@ fn main() {
 
     let scene = scene.build::<Bvh>();
 
-    let integrator = PathTracer::new(4, 512);
+    let integrator = BruteForcer::new(4, 512);
     integrator.render(&scene, &mut render_target);
 
     render_target.save("test.png");

@@ -7,6 +7,7 @@ use rayon::iter::ParallelIterator;
 use crate::accelerator::Accelerator;
 use crate::geometry::{Ray, cosine_hemisphere_map};
 use crate::light::Emitter;
+use crate::material::Material;
 use crate::scene::Scene;
 use crate::texture::RenderTarget;
 use super::Integrator;
@@ -34,24 +35,19 @@ impl BruteForcer
             let t2w = p.tangent_to_world();
             let w2t = t2w.transpose();
 
-            let wo = w2t * ray.direction;
-
-            let mut rng = thread_rng();
-            let u = Point2::new(rng.gen(), rng.gen());
-            let wi = cosine_hemisphere_map(&u);
-            let sample_pdf = wi.z / PI;
-            let sample_dir = t2w * wi;
+            let wo = w2t * -ray.direction;
+            let sample = p.sample_brdf(&wo);
+            let sample_dir = t2w * sample.wi;
 
             let next_ray = Ray {
                 origin: p.position + 0.0001 * p.normal,
                 direction: sample_dir,
-            };
-
-            let brdf = p.brdf(&wi, &wo);
+            };  
 
             let sample_radiance = self.sample_recursive(next_ray, scene, depth+1);
+            
+            return sample.brdf.component_mul(&sample_radiance) * sample.wi.z / sample.pdf;
 
-            return brdf.component_mul(&sample_radiance) * wi.z / sample_pdf;
         } else {
             let mut radiance = Vector3::from_element(0.0);
 

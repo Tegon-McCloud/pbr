@@ -66,7 +66,7 @@ impl PathTracer
 
             let t2w = p.tangent_to_world();
             let w2t = t2w.transpose();
-            let wo = w2t * ray.direction;
+            let wo = w2t * -ray.direction;
             let sample = p.sample_brdf(&wo);
 
             throughput = throughput.component_mul(&sample.brdf) * sample.wi.z / sample.pdf;
