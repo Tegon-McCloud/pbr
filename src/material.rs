@@ -127,33 +127,47 @@ impl GltfMaterial {
         2.0 / (1.0 + temp.sqrt())
     }
 
-    fn fresnel(i: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
+    fn fresnel_dielectric(i: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
         const R0: f32 = 0.04;
         R0 + (1.0 - R0) * (1.0 - i.dot(m)).powi(5)
     }
 
+    fn fresnel_conductor(i: &Vector3<f32>, m: &Vector3<f32>, f0: &Vector3<f32>) -> Vector3<f32> {
+        f0 + (Vector3::from_element(1.0) - f0) * (1.0 - i.dot(m)).powi(5)
+    }
+
+
     fn shadowing(alpha2: f32, i: &Vector3<f32>, o: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
         Self::one_way_shadowing(alpha2, i, m) * Self::one_way_shadowing(alpha2, o, m)
     }
+
 }
 
 
 impl Material for GltfMaterial {
 
     fn brdf(&self, uv: &Point2<f32>, i: &Vector3<f32>, o: &Vector3<f32>) -> Vector3<f32> {
-        let (_metal, rough) = self.metal_rough_at(uv);
+        let base_color = self.base_color_at(uv);
+        let (metal, rough) = self.metal_rough_at(uv);
         let alpha = rough * rough;
         let alpha2 = alpha * alpha;
+
+        let diffuse = base_color * FRAC_1_PI;
 
         let m = (i + o).normalize();
 
         let d = Self::facet_density(alpha2, &m);
-        let f = Self::fresnel(i, &m);
         let g = Self::shadowing(alpha2, i, o, &m);
 
-        let brdf = (d * g * f) / (4.0 * i.z * o.z);
+        let specular = (d * g) / (4.0 * i.z * o.z);
+        
+        let f_dielectric = Self::fresnel_dielectric(i, &m);
+        let f_conductor = Self::fresnel_conductor(i, &m, &base_color);
 
-        Vector3::from_element(brdf)
+        let dielectric_brdf = f_dielectric * Vector3::from_element(specular) + (1.0 - f_dielectric) * diffuse;
+        let metallic_brdf = specular * f_conductor;
+        
+        metal * metallic_brdf + (1.0 - metal) * dielectric_brdf
     }
 
     fn sample_brdf(&self, uv: &Point2<f32>, o: &Vector3<f32>) -> BrdfSample {
