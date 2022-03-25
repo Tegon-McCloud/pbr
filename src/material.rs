@@ -105,7 +105,7 @@ impl GltfMaterial {
         alpha2 / (PI * temp * temp)
     }
 
-    fn sample_facet(alpha2: f32) -> (Vector3<f32>, f32) {
+    pub fn sample_facet(alpha2: f32, o: &Vector3<f32>) -> (Vector3<f32>, f32) {
         let mut rng = thread_rng();
         let u: Point2<f32> = Point2::new(rng.gen(), rng.gen());
 
@@ -113,7 +113,11 @@ impl GltfMaterial {
         let sintheta = (1.0 - costheta * costheta).sqrt();
         let phi = 2.0 * PI * u.y;
 
-        let m = Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
+        let mut m = Vector3::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
+
+        if m.dot(o) < 0.0 {
+            m = -m;
+        }
 
         let pdf = Self::facet_density(alpha2, &m) * costheta;
 
@@ -176,9 +180,13 @@ impl Material for GltfMaterial {
         let alpha = rough * rough;
         let alpha2 = alpha * alpha;
 
-        let (m, m_pdf) = Self::sample_facet(alpha2);
+        let (m, m_pdf) = Self::sample_facet(alpha2, o);
 
         let mdoto = m.dot(o);
+
+        // if mdoto < 0.0 {
+        //     println!("rough: {:?}, m: {:?}, o: {:?}", rough, m, o);
+        // }
 
         let i = -o + 2.0 * mdoto * m;
         let pdf = m_pdf / (4.0 * mdoto);

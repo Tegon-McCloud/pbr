@@ -106,11 +106,13 @@ fn make_material(gltf_material: gltf::Material, _data: &GltfData) -> Box<dyn Mat
     let pmr = gltf_material.pbr_metallic_roughness();
 
     let base_color_factor = Vector4::from(pmr.base_color_factor()).xyz();
+    let metal_rough_factor = Vector2::new(pmr.metallic_factor(), pmr.roughness_factor());
+    
 
     let material = Box::new(
         GltfMaterial::new(
             base_color_factor,
-            Vector2::new(0.0, 0.1),
+            metal_rough_factor,
             None,
             None
         )
