@@ -14,9 +14,11 @@ use std::path::Path;
 use std::io::{Result, Error, ErrorKind};
 
 use super::Loader;
-use crate::material::GltfMaterial;
+use crate::material::LambertianMaterial;
 use crate::material::Material;
 use crate::scene::{SceneBuilder, Node, Mesh, Vertex};
+use crate::spectrum::Spectrum;
+use crate::texture::FactoredTexture;
 use crate::texture::Texture;
 
 use nalgebra::{Point3, Matrix4, Quaternion, convert, try_convert, Translation3, UnitQuaternion, Scale3, Affine3};
@@ -101,22 +103,35 @@ fn make_mesh(gltf_prim: gltf::Primitive, data: &GltfData) -> Mesh {
     Mesh { indices, vertices, material }
 }
 
-fn make_material(gltf_material: gltf::Material, _data: &GltfData) -> Box<dyn Material> {
+fn make_material(gltf_material: gltf::Material, data: &GltfData) -> Box<dyn Material> {
 
     let pmr = gltf_material.pbr_metallic_roughness();
 
-    let base_color_factor = Vector4::from(pmr.base_color_factor()).xyz();
+    let base_color_factor = Spectrum::from(&pmr.base_color_factor()[0..3]);
     let metal_rough_factor = Vector2::new(pmr.metallic_factor(), pmr.roughness_factor());
     
-
-    let material = Box::new(
-        GltfMaterial::new(
-            base_color_factor,
-            metal_rough_factor,
-            None,
-            None
-        )
+    let base_color = FactoredTexture::new(
+        base_color_factor, 
+        pmr.base_color_texture().map(|info| make_texture(info.texture(), data)),
     );
+
+    
+    let material: Box<dyn Material> = Box::new(LambertianMaterial::new(base_color));
+
+    // if metal_rough_factor.x == 0.0 {
+    //     material = Box::new(LambertianMaterial::new(&base_color_factor, base_color_texture));
+    // }  else {
+    //     material = Box::new(MetalMaterial::new(&base_color_factor));
+    // }
+
+    // let material = Box::new(
+    //     GltfMaterial::new(
+    //         base_color_factor,
+    //         metal_rough_factor,
+    //         None,
+    //         None
+    //     )
+    // );
 
     // if let Some(base_color_texture) = pmr.base_color_texture() {
     //     let base_color_texture = make_texture(base_color_texture.texture(), data);
@@ -129,7 +144,7 @@ fn make_material(gltf_material: gltf::Material, _data: &GltfData) -> Box<dyn Mat
     material
 }
 
-fn make_texture(gtlf_texture: gltf::Texture, data: &GltfData) -> Texture<Vector3<f32>> {
+fn make_texture(gtlf_texture: gltf::Texture, data: &GltfData) -> Texture<Spectrum<f32>> {
     let img_data = &data.1[gtlf_texture.source().index()];
 
     let pixels = &img_data.pixels;
@@ -137,8 +152,8 @@ fn make_texture(gtlf_texture: gltf::Texture, data: &GltfData) -> Texture<Vector3
     let height = img_data.height;
 
     match img_data.format {
-        gltf::image::Format::R8G8B8 => Texture::from_raw_data::<u8, 3>(width, height, pixels).unwrap(),
-        gltf::image::Format::R8G8B8A8 => Texture::from_raw_data::<u8, 4>(width, height, pixels).unwrap(),
+        gltf::image::Format::R8G8B8 => Texture::<Spectrum<f32>>::from_raw_data::<u8, 3>(width, height, pixels).unwrap(),
+        gltf::image::Format::R8G8B8A8 => Texture::<Spectrum<f32>>::from_raw_data::<u8, 4>(width, height, pixels).unwrap(),
         _ => todo!(),
     }
 }

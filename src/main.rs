@@ -1,10 +1,12 @@
-#![feature(total_cmp)]
+#![feature(total_cmp, destructuring_assignment)]
 #![allow(dead_code)]
+
 
 extern crate nalgebra;
 extern crate gltf;
 
 mod geometry;
+mod spectrum;
 mod scene;
 mod camera;
 mod loader;
@@ -18,27 +20,25 @@ use std::{path::Path, f32::consts::PI};
 
 
 use loader::Gltf;
-use material::GltfMaterial;
 use scene::SceneBuilder;
 use camera::Camera;
 use accelerator::*;
 use integrator::*;
 use light::*;
+use spectrum::Spectrum;
 use texture::*;
 
 use nalgebra::{Point3, Vector3};
 use texture::Texture;
 
 
-
 fn main() {
 
+    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/cubes.gltf")).unwrap();
 
-    let mut scene = SceneBuilder::from_file::<Gltf>(Path::new("resources/tank.gltf")).unwrap();
-
-    let mut render_target = RenderTarget::new(1024, 512, &Vector3::new(0.0, 0.0, 0.0));
-
-    let env_map = Texture::<Vector3<f32>>::from_hdr_file("resources/abandoned_greenhouse_4k.hdr");
+    let mut render_target = RenderTarget::new(1024, 512, &Spectrum::black());
+    
+    let env_map = Texture::<Spectrum<f32>>::from_hdr_file("resources/abandoned_greenhouse_4k.hdr");
     let sky_sphere = SkySphere::new(env_map);
     scene.light_sources.push(LightSource::SkySphere(sky_sphere));
 
@@ -52,7 +52,7 @@ fn main() {
 
     let scene = scene.build::<Bvh>();
 
-    let integrator = BruteForcer::new(4, 512);
+    let integrator = BruteForcer::new(4, 2048);
     integrator.render(&scene, &mut render_target);
 
     render_target.save("test.png");

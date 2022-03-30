@@ -1,14 +1,11 @@
-use std::f32::consts::PI;
-
-use nalgebra::{Vector3, Point2};
-use rand::{Rng, thread_rng};
+use nalgebra::{Vector3};
 use rayon::iter::ParallelIterator;
 
 use crate::accelerator::Accelerator;
-use crate::geometry::{Ray, cosine_hemisphere_map};
+use crate::geometry::Ray;
 use crate::light::Emitter;
-use crate::material::Material;
 use crate::scene::Scene;
+use crate::spectrum::Spectrum;
 use crate::texture::RenderTarget;
 use super::Integrator;
 
@@ -26,9 +23,9 @@ impl BruteForcer
         }
     }
 
-    fn sample_recursive<A: Accelerator>(&self, ray: Ray, scene: &Scene<A>, depth: u32) -> Vector3<f32> {
+    fn sample_recursive<A: Accelerator>(&self, ray: Ray, scene: &Scene<A>, depth: u32) -> Spectrum<f32> {
         if depth == self.depth {
-            return Vector3::from_element(0.0);
+            return Spectrum::black();
         }
         
         if let Some(p) = scene.intersect(&ray) {
@@ -46,11 +43,11 @@ impl BruteForcer
 
             let sample_radiance = self.sample_recursive(next_ray, scene, depth+1);
             
-            return sample.brdf.component_mul(&sample_radiance) * sample.wi.z / sample.pdf;
+            return sample.brdf * sample_radiance * (sample.wi.z / sample.pdf);
 
         } else {
-            let mut radiance = Vector3::from_element(0.0);
-
+            let mut radiance = Spectrum::black();
+            
             for bg_light in scene.background_lights() {
                 radiance += bg_light.emission(&ray.direction);
             }
@@ -60,7 +57,7 @@ impl BruteForcer
         
     }
 
-    fn sample_radiance<A: Accelerator>(&self, ray: Ray, scene: &Scene<A>) -> Vector3<f32> {
+    fn sample_radiance<A: Accelerator>(&self, ray: Ray, scene: &Scene<A>) -> Spectrum<f32> {
         self.sample_recursive(ray, scene, 0)
     }
 }
@@ -72,8 +69,8 @@ impl Integrator for BruteForcer
         target
             .pixels_par_mut()
             .for_each(|(uv, px)| {
-                let mut radiance = Vector3::zeros();
-
+                let mut radiance = Spectrum::black();
+                
                 for _ in 0..self.spp {
                     let ray = scene.camera.get_ray(&uv);
                     radiance += self.sample_radiance(ray, scene);

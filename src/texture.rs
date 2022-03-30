@@ -1,9 +1,10 @@
 use std::{io::{BufReader, Result, Error, ErrorKind}, fs::File, path::Path, ops::Mul};
 
 use image::{codecs::hdr, RgbaImage};
-use itertools::Itertools;
 use rayon::prelude::*;
 use nalgebra::{Point2, Vector3, SVector, Scalar, ClosedMul, ClosedDiv};
+
+use crate::spectrum::Spectrum;
 
 pub enum ColorSpace {
     Linear,
@@ -12,24 +13,22 @@ pub enum ColorSpace {
 
 pub struct Texture<T> {
     size: (u32, u32),
-    data: Vec<T>,
+    data: Box<[T]>,
 }
 
-pub type RenderTarget = Texture<Vector3<f32>>;
+pub type RenderTarget = Texture<Spectrum<f32>>;
 
 impl<T> Texture<T> where
     T: Copy
 {
     pub fn new(width: u32, height: u32, fill_col: &T) -> Self {
         let size = (width, height);
-        let data = vec![*fill_col; width as usize * height as usize];
-
+        let data = vec![*fill_col; width as usize * height as usize].into_boxed_slice();
+        
         Self { size, data, }
     }
 
-    pub fn sample<U>(&self, uv: &Point2<f32>) -> U where
-        U: From<T>
-    {
+    pub fn sample(&self, uv: &Point2<f32>) -> T {
         let u = uv[0];
         let v = uv[1];
 
@@ -38,7 +37,7 @@ impl<T> Texture<T> where
         
         let index = y as usize * self.size.0 as usize + x as usize;
 
-        self.data[index].into()
+        self.data[index]
     }
 
     pub fn aspect_ratio(&self) -> f32 {
@@ -103,8 +102,28 @@ macro_rules! impl_pixel_component {
 impl_pixel_component!(u8, 0, 255);
 impl_pixel_component!(f32, 0.0, 1.0);
 
+impl<T> Texture<Spectrum<T>> where
+    T: PixelComponent,
+{
+    pub fn from_raw_data<U, const K: usize>(width: u32, height: u32, data: &[u8]) -> Result<Self> where
+        U: PixelComponent,
+        T: From<U>,
+    {
+        let vec_texture = Texture::<SVector<T, 3>>::from_raw_data::<U, K>(width, height, data)?;
+        let (size, vec_data) = (vec_texture.size, vec_texture.data);
+
+        let data = unsafe { std::mem::transmute(vec_data) };
+        
+        Ok(Self {
+            size,
+            data,
+        })
+    }
+}
+
 impl<T, const D: usize> Texture<SVector<T, D>> where
-    T: PixelComponent {
+    T: PixelComponent 
+{
     pub fn from_raw_data<U, const K: usize>(width: u32, height: u32, data: &[u8]) -> Result<Self> where
         U: PixelComponent,
         T: From<U>,
@@ -126,7 +145,7 @@ impl<T, const D: usize> Texture<SVector<T, D>> where
                 let pixel_data = unsafe { std::slice::from_raw_parts(pixel_data.as_ptr() as *const U, D) };
                 SVector::<T, D>::from_fn(|j, _| T::map(pixel_data[j]))
             })
-            .collect_vec();
+            .collect();
 
         Ok(Self {
             size: (width, height),
@@ -137,7 +156,7 @@ impl<T, const D: usize> Texture<SVector<T, D>> where
 }
 
 
-impl Texture<Vector3<f32>> {
+impl Texture<Spectrum<f32>> {
     pub fn from_hdr_file(path: &str) -> Self {
         let reader = BufReader::new(File::open(path).unwrap());
         let decoder = hdr::HdrDecoder::new(reader).unwrap();
@@ -146,9 +165,9 @@ impl Texture<Vector3<f32>> {
         let data = decoder.read_image_hdr().unwrap();
         
         let data = data.into_iter()
-            .map(|px| Vector3::new(px[0], px[1], px[2]))
-            .collect_vec();
-        
+            .map(|px| Spectrum::new(px[0], px[1], px[2]))
+            .collect();
+
         Texture { size, data }
     }
 
@@ -158,7 +177,8 @@ impl Texture<Vector3<f32>> {
         self.data
             .iter()
             .copied()
-            .map(|mut px| { 
+            .map(|px| {
+                let mut px: Vector3<f32> = px.into();
                 px.apply(|x| *x = x.powf(1.0/2.2).mul(255.0).clamp(0.0, 255.0));
                 [px.x as u8, px.y as u8, px.z as u8, 255u8]
             })
@@ -167,8 +187,44 @@ impl Texture<Vector3<f32>> {
 
         img.save(path).unwrap();
     }
-
 }
 
 
+pub enum MaybeTexture<T> {
+    Texture(Texture<T>),
+    Value(T),
+}
 
+impl<T> MaybeTexture<T> where
+    T: Copy,
+{
+    pub fn sample(&self, uv: &Point2<f32>) -> T {
+        match self {
+            Self::Texture(texture) => texture.sample(uv),
+            Self::Value(value) => *value,
+        }
+    }
+}
+
+pub struct FactoredTexture<T> {
+    pub factor: T,
+    pub texture: Option<Texture<T>>,
+}
+
+impl<T> FactoredTexture<T> where
+    T: Copy + ClosedMul
+{
+    pub fn new(factor: T, texture: Option<Texture<T>>) -> Self {
+        Self {
+            factor,
+            texture,
+        }
+    }
+
+    pub fn sample(&self, uv: &Point2<f32>) -> T {
+        match &self.texture {
+            Some(texture) => self.factor * texture.sample(uv),
+            None => self.factor,
+        }
+    }
+}

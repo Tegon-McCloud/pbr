@@ -1,8 +1,7 @@
 
-use nalgebra::Vector3;
 use rayon::iter::ParallelIterator;
 
-use crate::{accelerator::Accelerator, geometry::{Ray, SurfacePoint}, scene::Scene, light::Emitter};
+use crate::{accelerator::Accelerator, geometry::{Ray, SurfacePoint}, scene::Scene, light::Emitter, spectrum::Spectrum};
 use super::Integrator;
 
 pub struct PathTracer {
@@ -19,8 +18,8 @@ impl PathTracer
         }
     }
 
-    pub fn sample_direct<A: Accelerator>(&self, ray: &Ray, p: &SurfacePoint, scene: &Scene<A>) -> Vector3<f32> {
-
+    pub fn sample_direct<A: Accelerator>(&self, ray: &Ray, p: &SurfacePoint, scene: &Scene<A>) -> Spectrum<f32> {
+        
         let (light, light_pdf) = scene.pick_light();
 
         let sample = light.sample(p);
@@ -34,17 +33,17 @@ impl PathTracer
 
             let brdf = p.brdf(&wi, &wo);
 
-            sample.radiance.component_mul(&brdf) * wi.z / pdf
+            sample.radiance * brdf * (wi.z / pdf)
         } else {
-            return Vector3::new(0.0, 0.0, 0.0);
+            Spectrum::black()
         }
         
     }
 
-    pub fn sample_radiance<A: Accelerator>(&self, mut ray: Ray, scene: &Scene<A>) -> Vector3<f32> {
-        let mut radiance = Vector3::new(0.0, 0.0, 0.0);
-        let mut throughput = Vector3::new(1.0, 1.0, 1.0);
-        
+    pub fn sample_radiance<A: Accelerator>(&self, mut ray: Ray, scene: &Scene<A>) -> Spectrum<f32> {
+        let mut radiance = Spectrum::black();
+        let mut throughput = Spectrum::constant(1.0);
+
         for bounce in 0..self.depth {
             
             let isect = scene.intersect(&ray);
@@ -54,7 +53,7 @@ impl PathTracer
                 // if this was the camera ray, add the emission from the background (since it wasn't directly sampled)
                 if bounce == 0 {
                     for bgl in scene.background_lights() {
-                        radiance += bgl.emission(&ray.direction).component_mul(&throughput);
+                        radiance += bgl.emission(&ray.direction) * throughput;
                     }
                 }
                 break;
@@ -62,14 +61,14 @@ impl PathTracer
 
             let p = isect.unwrap();
 
-            radiance += self.sample_direct(&ray, &p, scene).component_mul(&throughput);
+            radiance += self.sample_direct(&ray, &p, scene) * throughput;
 
             let t2w = p.tangent_to_world();
             let w2t = t2w.transpose();
             let wo = w2t * -ray.direction;
             let sample = p.sample_brdf(&wo);
 
-            throughput = throughput.component_mul(&sample.brdf) * sample.wi.z / sample.pdf;
+            throughput = throughput * sample.brdf * (sample.wi.z / sample.pdf);
             
             ray = Ray {
                 origin: p.position + 0.0001 * p.normal,
@@ -88,7 +87,7 @@ impl Integrator for PathTracer {
         target
             .pixels_par_mut()
             .for_each(|(uv, px)| {
-                let mut radiance = Vector3::zeros();
+                let mut radiance = Spectrum::black();
 
                 for _ in 0..self.spp {
                     let ray = scene.camera.get_ray(&uv);

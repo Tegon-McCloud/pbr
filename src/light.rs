@@ -4,7 +4,7 @@ use enum_dispatch::enum_dispatch;
 use nalgebra::{Vector3, Point3, Point2, Matrix3};
 use rand::{thread_rng, Rng};
 
-use crate::{geometry::{SurfacePoint, Ray, uniform_hemisphere_map}, accelerator::Accelerator, texture::Texture, scene::Scene};
+use crate::{geometry::{SurfacePoint, Ray, uniform_hemisphere_map}, accelerator::Accelerator, texture::Texture, scene::Scene, spectrum::Spectrum};
 
 pub enum VisibilityTest {
     PointToPoint {
@@ -48,7 +48,7 @@ impl VisibilityTest {
 }
 
 pub struct RadianceSample {
-    pub radiance: Vector3<f32>,
+    pub radiance: Spectrum<f32>,
     pub direction: Vector3<f32>,
     pub pdf: f32,
     pub visibility_test: VisibilityTest,
@@ -56,7 +56,7 @@ pub struct RadianceSample {
 
 #[enum_dispatch]
 pub trait Emitter {
-    fn emission(&self, dir: &Vector3<f32>) -> Vector3<f32>;
+    fn emission(&self, dir: &Vector3<f32>) -> Spectrum<f32>;
     fn sample(&self, p: &SurfacePoint) -> RadianceSample;
     fn is_delta(&self) -> bool;
     fn is_background(&self) -> bool;
@@ -71,12 +71,12 @@ pub enum LightSource {
 
 pub struct DirectionalLight {
     pub neg_direction: Vector3<f32>,
-    pub irradiance: Vector3<f32>,
+    pub irradiance: Spectrum<f32>,
 }
 
 impl Emitter for DirectionalLight {
-    fn emission(&self, _dir: &Vector3<f32>) -> Vector3<f32> {
-        Vector3::zeros()
+    fn emission(&self, _dir: &Vector3<f32>) -> Spectrum<f32> {
+        Spectrum::black()
     }
 
     fn sample(&self, p: &SurfacePoint) -> RadianceSample {
@@ -98,17 +98,17 @@ impl Emitter for DirectionalLight {
 }
 
 pub struct SkySphere {
-    texture: Texture<Vector3<f32>>,
+    texture: Texture<Spectrum<f32>>,
 }
 
 impl SkySphere {
-    pub fn new(texture: Texture<Vector3<f32>>) -> Self {
+    pub fn new(texture: Texture<Spectrum<f32>>) -> Self {
         Self { texture }
     }
 }
 
 impl Emitter for SkySphere {
-    fn emission(&self, dir: &Vector3<f32>) -> Vector3<f32> {
+    fn emission(&self, dir: &Vector3<f32>) -> Spectrum<f32> {
         let uv = Point2::new(
             1.0 / (2.0 * PI) * f32::atan2(dir[2], dir[0]),
             1.0 / PI * f32::acos(dir[1]),
@@ -151,10 +151,10 @@ impl Emitter for SkySphere {
 pub struct TestLight {}
 
 impl Emitter for TestLight {
-    fn emission(&self, dir: &Vector3<f32>) -> Vector3<f32> {
+    fn emission(&self, dir: &Vector3<f32>) -> Spectrum<f32> {
         let light_dir = Vector3::new(1.0, 1.0, 1.0).normalize();
-        let light_col = Vector3::new(1.0, 1.0, 1.0);
-        light_dir.dot(dir).max(0.0) * light_col
+        let light_col = Spectrum::new(1.0, 1.0, 1.0);
+        light_col * light_dir.dot(dir).max(0.0)
     }
 
     fn sample(&self, p: &SurfacePoint) -> RadianceSample {
@@ -170,10 +170,10 @@ impl Emitter for TestLight {
         let sample_dir = t2w * uniform_hemisphere_map(&u);
 
         let light_dir = Vector3::new(1.0, 1.0, 1.0).normalize();
-        let light_col = Vector3::new(1.0, 1.0, 1.0);
-        let irradiance = light_dir.dot(&sample_dir).max(0.0) * light_col;
+        let light_col = Spectrum::new(1.0, 1.0, 1.0);
+        let irradiance = light_col * light_dir.dot(&sample_dir).max(0.0);
         let vis_test = VisibilityTest::PointInDirection { p: p.position + 0.0001 * p.normal, d: sample_dir, };
-
+        
         RadianceSample {
             radiance: irradiance,
             direction: sample_dir,

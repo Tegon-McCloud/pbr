@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use float_cmp::approx_eq;
 use nalgebra::{Vector3, Point3, Point2, Matrix3};
 
-use crate::{scene::Vertex, material::{Material, BrdfSample}};
+use crate::{scene::Vertex, material::{Material, BrdfSample}, spectrum::Spectrum};
 
 #[derive(Clone, Copy)]
 pub struct Ray {
@@ -47,7 +47,7 @@ impl<'s> SurfacePoint<'s> {
         Matrix3::from_columns(&[t, b, n])   
     }
 
-    pub fn brdf(&self, wi: &Vector3<f32>, wo: &Vector3<f32>) -> Vector3<f32> {
+    pub fn brdf(&self, wi: &Vector3<f32>, wo: &Vector3<f32>) -> Spectrum<f32> {
         self.material.brdf(&self.tex_coords, wi, wo)
     }
     
@@ -333,8 +333,8 @@ mod test {
             },
         ];
 
-        let material: Box<dyn Material> = Box::new(LambertianMaterial::flat(&Vector3::zeros()));
-
+        let material: Box<dyn Material> = Box::new(LambertianMaterial::flat(Spectrum::black()));
+        
         let result = SurfacePoint::new(
             &Vector3::new(0.5, 0.25, 0.25),
             &[&vertices[0], &vertices[1], &vertices[2]],
