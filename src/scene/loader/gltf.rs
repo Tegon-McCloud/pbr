@@ -25,23 +25,20 @@ use nalgebra::{Point3, Matrix4, Quaternion, convert, try_convert, Translation3, 
 struct GltfData(Vec<gltf::buffer::Data>, Vec<gltf::image::Data>);
 
 impl Loader for Gltf {
-    fn load_from_file(path: &Path) -> Result<SceneBuilder> {
-
+    fn load_from_file<P: AsRef<Path>>(path: P, builder: &mut SceneBuilder) -> Result<()> {
+        
         let (document, buffers, images) = gltf::import(path).map_err(|_| Error::from(ErrorKind::InvalidData))?;
         let data = GltfData(buffers, images);
 
         let gltf_scene = document.default_scene().unwrap();
 
-        let children = gltf_scene.nodes()
-            .map(|gltf_node| make_node(gltf_node, &data))
-            .collect();
+        builder.root.children.extend(gltf_scene.nodes()
+            .map(|gltf_node| make_node(gltf_node, &data)));
 
-        let root = Node { children, ..Default::default() };
-
-        Ok(SceneBuilder { root, ..Default::default() })
+        Ok(())
     }
 
-    fn load_from_reader<R: Read + Seek>(_rdr: &mut R) -> Result<SceneBuilder> {
+    fn load_from_reader<R: Read + Seek>(_rdr: &mut R, _builder: &mut SceneBuilder) -> Result<()> {
         unimplemented!()
     }
 }
@@ -114,7 +111,6 @@ fn make_material(gltf_material: gltf::Material, data: &GltfData) -> Box<dyn Mate
         base_color_factor, 
         pmr.base_color_texture().map(|info| make_texture(info.texture(), data)),
     );
-
     
     let material: Box<dyn Material> = Box::new(LambertianMaterial::new(base_color));
 

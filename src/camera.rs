@@ -7,6 +7,7 @@ pub enum Camera {
 }
 
 impl Camera {
+
     pub fn perspective_look_at(pos: &Point3<f32>, focus: &Point3<f32>, up_dir: &Vector3<f32>, vfov: f32, aspect: f32) -> Camera {
         Self::perspective_look_to(pos, &(focus - pos), up_dir, vfov, aspect)
     }
