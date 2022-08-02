@@ -1,4 +1,4 @@
-use nalgebra::{Vector3};
+
 use rayon::iter::ParallelIterator;
 
 use crate::accelerator::Accelerator;
@@ -72,7 +72,7 @@ impl Integrator for BruteForcer
                 let mut radiance = Spectrum::black();
                 
                 for _ in 0..self.spp {
-                    let ray = scene.camera.get_ray(&uv);
+                    let ray = scene.get_camera().get_ray(&uv);
                     radiance += self.sample_radiance(ray, scene);
                 }
 

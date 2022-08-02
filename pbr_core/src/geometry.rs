@@ -1,6 +1,5 @@
 use std::f32::consts::PI;
 
-use float_cmp::approx_eq;
 use nalgebra::{Vector3, Point3, Point2, Matrix3};
 
 use crate::{scene::Vertex, material::{Material, BrdfSample}, spectrum::Spectrum};
@@ -180,7 +179,7 @@ pub fn triangle_intersect(p1: &Point3<f32>, p2: &Point3<f32>, p3: &Point3<f32>, 
         let b = Vector3::new(n2.norm(), n3.norm(), n1.norm());
         let area = b.x + b.y + b.z;
 
-        debug_assert!(approx_eq!(f32, n.norm(), area, ulps = 5));
+        // debug_assert!(approx_eq!(f32, n.norm(), area, ulps = 5));
 
         return Some((t, b/area));
     }

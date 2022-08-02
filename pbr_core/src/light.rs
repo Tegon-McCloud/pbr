@@ -28,8 +28,8 @@ impl VisibilityTest {
         
                 let dist = (p2 - p1).norm();
         
-                match scene.accelerator.intersect(&ray) {
-                    Some(info) => info.t <= dist,
+                match scene.intersect_dist(&ray) {
+                    Some(t) => t <= dist,
                     None => true,
                 }
             },
@@ -40,7 +40,7 @@ impl VisibilityTest {
                     direction: d.normalize(),
                 };
 
-                scene.accelerator.intersect(&ray).is_none()
+                scene.intersect_dist(&ray).is_none()
             }
         }
 

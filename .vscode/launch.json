@@ -7,59 +7,53 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=pbr",
-                    "--package=pbr"
-                ],
-                "filter": {
-                    "name": "pbr",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}",
-            "env": {
-                "RUST_BACKTRACE": "1"
-            }
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Release",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=pbr",
-                    "--package=pbr",
-                    "--release"
-                ],
-                "filter": {
-                    "name": "pbr",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}",
-            "env": {
-                "RUST_BACKTRACE": "1"
-            }
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Unit tests",
+            "name": "Debug unit tests in library 'pbr_core'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=pbr",
-                    "--package=pbr"
+                    "--lib",
+                    "--package=pbr_core"
                 ],
                 "filter": {
-                    "name": "pbr",
+                    "name": "pbr_core",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'pbr_gui'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=pbr_gui",
+                    "--package=pbr_gui"
+                ],
+                "filter": {
+                    "name": "pbr_gui",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'pbr_gui'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=pbr_gui",
+                    "--package=pbr_gui"
+                ],
+                "filter": {
+                    "name": "pbr_gui",
                     "kind": "bin"
                 }
             },

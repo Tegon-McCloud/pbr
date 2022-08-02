@@ -84,13 +84,14 @@ impl PathTracer
 
 impl Integrator for PathTracer {
     fn render<A: Accelerator>(&self, scene: &Scene<A>, target: &mut crate::texture::RenderTarget) {
+        
         target
             .pixels_par_mut()
             .for_each(|(uv, px)| {
                 let mut radiance = Spectrum::black();
 
                 for _ in 0..self.spp {
-                    let ray = scene.camera.get_ray(&uv);
+                    let ray = scene.get_camera().get_ray(&uv);
                     radiance += self.sample_radiance(ray, &scene);
                 }
 
