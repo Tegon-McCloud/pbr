@@ -1,0 +1,51 @@
+#version 460
+
+struct Vertex {
+    vec3 position;
+    vec3 normal;
+};
+
+struct Ray {
+    vec3 origin;
+    vec3 direction;
+};
+
+layout(set = 0, binding = 0) readonly buffer Vertices {
+    Vertex vertices[];
+} vertices;
+
+layout(set = 0, binding = 1) readonly buffer Indices {
+    uint indices[];
+} indices;
+
+layout(set = 1, binding = 0) buffer Rays {
+    Ray rays[];
+} rays;
+
+bool triangleIntersect(in Ray ray, in Vertex v1, in Vertex v2, in Vertex v3, out vec3 barycentrics) {
+    vec3 e12 = v2.position - v1.position;
+    vec3 e13 = v3.position - v1.position;
+    vec3 n   = cross(e12, e13);
+
+    float ddotn =  dot(n, ray.direction);
+    if(ddotn < 0) {
+        return false;
+    }
+ 
+    float t = dot(v1.position - ray.origin, n) / ddotn;
+    vec3 p = ray.origin + t * ray.direction;
+
+    vec3 e23 = v3.position - v2.position;
+    vec3 e31 = -e13;
+
+    float n1dotn = dot(cross(e12, p - v1.position), n);
+    float n2dotn = dot(cross(e23, p - v2.position), n);
+    float n3dotn = dot(cross(e13, p - v3.position), n);
+    
+    if (n1dotn > 0 && n2dotn > 0 && n3dotn > 0) {
+        
+        
+        return true;
+    }
+}
+
