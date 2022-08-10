@@ -73,6 +73,10 @@ fn main() {
     event_loop.run(move |event, _, control_flow| {
         
         if let Event::MainEventsCleared = event {
+            window.request_redraw();
+        }
+
+        if let Event::RedrawRequested(_) = event {
             match rx.recv() {
                 Ok(img) => {
                     for (wnd_px, (_, px)) in pixels.get_frame().chunks_exact_mut(4).zip(img.pixels()) {

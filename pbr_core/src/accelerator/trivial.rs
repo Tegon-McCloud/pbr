@@ -1,12 +1,10 @@
 
 use itertools::izip;
 use crate::scene::Vertex;
-use crate::material::{Material};
 use crate::geometry::{Ray, triangle_intersect};
 use super::{Accelerator, HitInfo};
 
 pub struct Trivial {
-    materials: Vec<Box<dyn Material>>,
     vertices: Vec<Vec<Vertex>>,
     triangles: Vec<Vec<[u32; 3]>>,
 }
@@ -26,7 +24,6 @@ impl Accelerator for Trivial {
             .unzip();
 
         Trivial {
-            materials: Vec::new(),
             vertices,
             triangles,
         }
