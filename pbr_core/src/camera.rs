@@ -1,4 +1,5 @@
 use nalgebra::{Point3, Vector3, Point2, Vector2};
+use rand::Rng;
 
 use crate::geometry::Ray;
 
@@ -29,11 +30,18 @@ impl Camera {
         })
     }
 
-    pub fn get_ray(&self, uv: &Point2<f32>) -> Ray {
+    pub fn get_ray(&self, xy: Point2<u32>, img_size: (u32, u32)) -> Ray {
+        let mut rng = rand::thread_rng();
+        
+        let uv = Point2::new(
+            (xy.x as f32 + rng.gen::<f32>()) / img_size.0 as f32,
+            1.0 - (xy.y as f32 + rng.gen::<f32>()) / img_size.1 as f32,
+        );
+        
         match self {
-            Self::Perspective(camera) => camera.get_ray(uv),
+            Self::Perspective(camera) => camera.get_ray(&uv),
         }
-    } 
+    }
 }
 
 impl Default for Camera {

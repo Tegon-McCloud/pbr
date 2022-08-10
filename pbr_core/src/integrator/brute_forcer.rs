@@ -1,13 +1,12 @@
 
-use rayon::iter::ParallelIterator;
+use nalgebra::Point2;
 
 use crate::accelerator::Accelerator;
 use crate::geometry::Ray;
 use crate::light::Emitter;
 use crate::scene::Scene;
 use crate::spectrum::Spectrum;
-use crate::texture::RenderTarget;
-use super::Integrator;
+use super::SamplingIntegrator;
 
 pub struct BruteForcer {
     depth: u32,
@@ -56,28 +55,16 @@ impl BruteForcer
         }
         
     }
-
-    fn sample_radiance<A: Accelerator>(&self, ray: Ray, scene: &Scene<A>) -> Spectrum<f32> {
-        self.sample_recursive(ray, scene, 0)
-    }
 }
 
-impl Integrator for BruteForcer
+impl SamplingIntegrator for BruteForcer
 {   
-    fn render<A: Accelerator>(&self, scene: &Scene<A>, target: &mut RenderTarget) {
-        
-        target
-            .pixels_par_mut()
-            .for_each(|(uv, px)| {
-                let mut radiance = Spectrum::black();
-                
-                for _ in 0..self.spp {
-                    let ray = scene.get_camera().get_ray(&uv);
-                    radiance += self.sample_radiance(ray, scene);
-                }
+    fn get_spp(&self) -> u32 {
+        self.spp
+    }
 
-                radiance /= self.spp as f32;
-                *px = radiance
-            });
+    fn sample<A: Accelerator>(&self, scene: &Scene<A>, xy: Point2<u32>, size: (u32, u32)) -> Spectrum<f32> {
+        let ray = scene.get_camera().get_ray(xy, size);
+        self.sample_recursive(ray, scene, 0)
     }
 }

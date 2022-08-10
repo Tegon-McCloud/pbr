@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![feature(sync_unsafe_cell)]
 
 pub use nalgebra;
 

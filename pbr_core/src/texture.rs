@@ -1,8 +1,8 @@
 use std::{io::{BufReader, Result, Error, ErrorKind}, fs::File, path::Path, ops::Mul};
 
 use image::{codecs::hdr, RgbaImage};
-use rayon::prelude::*;
 use nalgebra::{Point2, Vector3, SVector, Scalar, ClosedMul, ClosedDiv};
+use rayon::prelude::{IntoParallelRefIterator, IndexedParallelIterator, ParallelIterator, IntoParallelRefMutIterator};
 
 use crate::spectrum::Spectrum;
 
@@ -11,12 +11,21 @@ pub enum ColorSpace {
     Srgb,
 }
 
+#[derive(Clone)]
 pub struct Texture<T> {
     size: (u32, u32),
     data: Box<[T]>,
 }
 
-pub type RenderTarget = Texture<Spectrum<f32>>;
+impl<T> Texture<T> {
+    pub fn size(&self) -> (u32, u32) {
+        self.size
+    }
+
+    pub fn set(&mut self, pos: Point2<u32>, val: T) {
+        self.data[(pos.y * self.size.0 + pos.x) as usize] = val;
+    }
+}
 
 impl<T> Texture<T> where
     T: Copy
@@ -44,39 +53,53 @@ impl<T> Texture<T> where
         self.size.0 as f32 / self.size.1 as f32
     }
 
-    pub fn pixels_mut<'a>(&'a mut self) -> impl Iterator<Item=(Point2<f32>, &mut T)> + 'a {
+    pub fn pixels(&self) -> impl Iterator<Item = (Point2<u32>, &T)> {
+        self.data
+            .iter()
+            .enumerate()
+            .map(|(pos, px)| (
+                Point2::new(pos as u32 % self.size.0, pos as u32 / self.size.0),
+                px
+            ))
+    }
+
+    pub fn pixels_mut(&mut self) -> impl Iterator<Item = (Point2<u32>, &mut T)> {
         self.data
             .iter_mut()
             .enumerate()
-            .map(|(pos, px)| {
-                let pos = pos as u32;
-                let x = pos % self.size.0;
-                let y = self.size.1 - pos / self.size.0;
-                let uv = Point2::new(
-                    (x as f32 + 0.5)/self.size.0 as f32,
-                    (y as f32 + 0.5)/self.size.1 as f32,
-                );
-                (uv, px)
-            })
+            .map(|(pos, px)| (
+                Point2::new(pos as u32 % self.size.0, pos as u32 / self.size.0),
+                px
+            ))
+    }
+
+}
+
+impl<T> Texture<T> where
+    T: Sync
+{
+    pub fn par_pixels(&self) -> impl ParallelIterator<Item = (Point2<u32>, &T)> {
+        self.data
+            .par_iter()
+            .enumerate()
+            .map(|(pos, px)| (
+                Point2::new(pos as u32 % self.size.0, pos as u32 / self.size.0),
+                px
+            ))
     }
 }
 
 impl<T> Texture<T> where
-    T: Send + Sync 
+    T: Send
 {
-    pub fn pixels_par_mut<'a>(&'a mut self) -> impl ParallelIterator<Item=(Point2<f32>, &mut T)> + 'a {
+    pub fn par_pixels_mut(&mut self) -> impl ParallelIterator<Item = (Point2<u32>, &mut T)> {
         self.data
             .par_iter_mut()
             .enumerate()
-            .map(|(pos, px)| {
-                let x = pos as u32 % self.size.0;
-                let y = pos as u32 / self.size.0;
-                let uv = Point2::new(
-                    (x as f32 + 0.5)/self.size.0 as f32,
-                    1.0 - (y as f32 + 0.5)/self.size.1 as f32,
-                );
-                (uv, px)
-            })
+            .map(|(pos, px)| (
+                Point2::new(pos as u32 % self.size.0, pos as u32 / self.size.0),
+                px
+            ))
     }
 }
 

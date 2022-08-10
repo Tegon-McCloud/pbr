@@ -4,7 +4,7 @@ use nalgebra::{Scalar, ClosedMul, ClosedAdd, ClosedSub, ClosedDiv, Vector3};
 use num_traits::{Zero};
 
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Spectrum<T: Scalar> {
     pub r: T,
     pub g: T,
@@ -20,6 +20,12 @@ impl<T: Scalar> Spectrum<T> {
     pub fn constant(c: T) -> Self {
         Self::new(c.clone(), c.clone(), c.clone())
     }
+
+    pub fn apply(&mut self, f: impl Fn(&mut T)) {
+        f(&mut self.r);
+        f(&mut self.g);
+        f(&mut self.b);
+    }
 }
 
 impl<T: Scalar> Spectrum<T> where
@@ -29,10 +35,6 @@ impl<T: Scalar> Spectrum<T> where
         Self::constant(T::zero())
     }
 }
-
-impl<T: Scalar> Copy for Spectrum<T> where
-    T: Copy {}
-
 
 impl<T: Scalar> From<&[T]> for Spectrum<T> where
     T: Copy

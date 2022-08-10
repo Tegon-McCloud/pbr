@@ -1,8 +1,9 @@
 
-use rayon::iter::ParallelIterator;
+
+use nalgebra::Point2;
 
 use crate::{accelerator::Accelerator, geometry::{Ray, SurfacePoint}, scene::Scene, light::Emitter, spectrum::Spectrum};
-use super::Integrator;
+use super::SamplingIntegrator;
 
 pub struct PathTracer {
     depth: u32,
@@ -19,7 +20,7 @@ impl PathTracer
     }
 
     pub fn sample_direct<A: Accelerator>(&self, ray: &Ray, p: &SurfacePoint, scene: &Scene<A>) -> Spectrum<f32> {
-        
+
         let (light, light_pdf) = scene.pick_light();
 
         let sample = light.sample(p);
@@ -40,7 +41,19 @@ impl PathTracer
         
     }
 
-    pub fn sample_radiance<A: Accelerator>(&self, mut ray: Ray, scene: &Scene<A>) -> Spectrum<f32> {
+}
+
+impl SamplingIntegrator for PathTracer {
+
+    fn get_spp(&self) -> u32 {
+        self.spp
+    }
+
+    fn sample<A: Accelerator>(&self, scene: &Scene<A>, xy: Point2<u32>, size: (u32, u32)) -> Spectrum<f32> {
+
+
+        let mut ray = scene.get_camera().get_ray(xy, size);
+
         let mut radiance = Spectrum::black();
         let mut throughput = Spectrum::constant(1.0);
 
@@ -78,25 +91,5 @@ impl PathTracer
         }
 
         radiance
-    }
-
-}
-
-impl Integrator for PathTracer {
-    fn render<A: Accelerator>(&self, scene: &Scene<A>, target: &mut crate::texture::RenderTarget) {
-        
-        target
-            .pixels_par_mut()
-            .for_each(|(uv, px)| {
-                let mut radiance = Spectrum::black();
-
-                for _ in 0..self.spp {
-                    let ray = scene.get_camera().get_ray(&uv);
-                    radiance += self.sample_radiance(ray, &scene);
-                }
-
-                radiance /= self.spp as f32;
-                *px = radiance
-            });
     }
 }
