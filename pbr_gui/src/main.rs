@@ -9,7 +9,8 @@ use pbr_core::{
     camera::Camera,
     accelerator::Bvh,
     integrator::{Integrator, PathTracer, BruteForcer},
-    nalgebra::{Point3, Vector3}
+    nalgebra::{Point3, Vector3},
+    tone_map::{ToneMap, ReinhardToneMap, self, LinearToneMap},
 };
 use winit::{
     event_loop::{EventLoop, ControlFlow},
@@ -24,7 +25,7 @@ fn main() {
     
     let begin_time = std::time::Instant::now();
 
-    let render_size = (960, 540);
+    let render_size = (1280, 720);
     let env_map = Texture::<Spectrum<f32>>::from_hdr_file("resources/abandoned_greenhouse_4k.hdr");
 
     let scene = SceneBuilder::new()
@@ -45,8 +46,9 @@ fn main() {
     
     println!("Build time: {}s", (std::time::Instant::now() - begin_time).as_secs_f32());
     
-    let integrator = BruteForcer::new(4, 2048);
-
+    let integrator = BruteForcer::new(4, 512);
+    let tone_map = ReinhardToneMap::with_whitepoint(100.0);
+    
     let event_loop = EventLoop::new();
     let size = LogicalSize::new(render_size.0, render_size.1);
     let window = WindowBuilder::new()
@@ -64,14 +66,15 @@ fn main() {
     let _render_thread = std::thread::spawn(move || {
         let begin_time = std::time::Instant::now();
         
-        let final_img = integrator.render(&scene, render_size, |img| tx.send(img.clone()).unwrap_or(()));
+        let mut render_img = integrator.render(&scene, render_size, |img| tx.send(img.clone()).unwrap_or(()));
+        tone_map.apply(&mut render_img);
 
         println!("Render time: {}s", (std::time::Instant::now() - begin_time).as_secs_f32());
-        final_img.save("test.png");
+        render_img.save("test.png");
     });
 
     event_loop.run(move |event, _, control_flow| {
-        
+
         if let Event::MainEventsCleared = event {
             window.request_redraw();
         }
@@ -79,6 +82,7 @@ fn main() {
         if let Event::RedrawRequested(_) = event {
             match rx.recv() {
                 Ok(img) => {
+
                     for (wnd_px, (_, px)) in pixels.get_frame().chunks_exact_mut(4).zip(img.pixels()) {
                         let mut px = *px;
                         px.apply(|x| *x = x.powf(1.0/2.2).mul(255.0).clamp(0.0, 255.0));

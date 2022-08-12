@@ -12,5 +12,5 @@ pub mod camera;
 pub mod scene;
 pub mod accelerator;
 pub mod integrator;
-
+pub mod tone_map;
 

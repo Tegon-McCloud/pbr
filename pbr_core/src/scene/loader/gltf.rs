@@ -4,7 +4,6 @@ pub use gltf::Glb;
 
 use itertools::izip;
 use nalgebra::Point2;
-use nalgebra::Vector2;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
 
@@ -14,10 +13,10 @@ use std::path::Path;
 use std::io::{Result, Error, ErrorKind};
 
 use super::Loader;
+use crate::material::MetalMaterial;
 use crate::{
     material::{Material, Ggx, MicrofacetMaterial},
     scene::{SceneBuilder, Node, Mesh, Vertex},
-    texture::{Texture, FactoredTexture},
     spectrum::Spectrum,
 };
 
@@ -105,16 +104,21 @@ fn make_material(gltf_material: gltf::Material, _data: &GltfData) -> Box<dyn Mat
 
     let pmr = gltf_material.pbr_metallic_roughness();
 
-    //let base_color_factor = Spectrum::from(&pmr.base_color_factor()[0..3]);
-    let metal_rough_factor = Vector2::new(pmr.metallic_factor(), pmr.roughness_factor());
-    
+    let base_color_factor = Spectrum::from(&pmr.base_color_factor()[0..3]);
+    let metallic_factor = pmr.metallic_factor();
+    let roughness_factor = pmr.roughness_factor();
+
+    let material: Box<dyn Material> = if metallic_factor < 0.5 {
+        Box::new(MicrofacetMaterial::<Ggx>::new(roughness_factor))
+    } else {
+        Box::new(MetalMaterial::<Ggx>::new(roughness_factor, base_color_factor))
+    };
+
     // let base_color = FactoredTexture::new(
     //     base_color_factor, 
     //     pmr.base_color_texture().map(|info| make_texture(info.texture(), data)),
     // );
-    
-    let material: Box<dyn Material> = Box::new(MicrofacetMaterial::<Ggx>::new(metal_rough_factor.y));
-    
+
     material
 }
 

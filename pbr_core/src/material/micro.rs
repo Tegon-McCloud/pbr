@@ -4,9 +4,9 @@ use nalgebra::{Vector3, Point2};
 
 use crate::spectrum::Spectrum;
 
-use super::{Material, BrdfSample, MicrofacetDistribution, ndot, Ggx};
+use super::{Material, BrdfSample, MicrofacetDistribution, ndot};
 
-pub fn fresnel_schlick(i: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
+fn fresnel_schlick(i: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
     let pow5 = |x: f32| (x * x) * (x * x) * x;
     let r0 = 0.04;
 
@@ -48,7 +48,7 @@ impl<T> Material for MicrofacetMaterial<T> where
 
     fn sample_brdf(&self, uv: &Point2<f32>, wo: &Vector3<f32>) -> BrdfSample {
         
-        let distribution = Ggx::new_isotropic(self.roughness);
+        let distribution = T::new_isotropic(self.roughness);
 
         let (m, pdf_m) = distribution.sample_facet(wo);
         let mdoto = m.dot(wo);
@@ -66,4 +66,3 @@ impl<T> Material for MicrofacetMaterial<T> where
     }
     
 }
-

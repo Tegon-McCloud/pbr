@@ -1,14 +1,12 @@
 mod lambert;
-//mod metal;
-//mod gltf;
 mod micro;
+mod metal;
 
 use crate::spectrum::Spectrum;
 
 pub use self::lambert::LambertianMaterial;
-//pub use self::metal::MetalMaterial;
-//pub use self::gltf::GltfMaterial;
 pub use micro::MicrofacetMaterial;
+pub use self::metal::MetalMaterial;
 
 
 use std::f32::consts::PI;

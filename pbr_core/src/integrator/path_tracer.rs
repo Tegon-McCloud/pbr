@@ -60,7 +60,7 @@ impl SamplingIntegrator for PathTracer {
         for bounce in 0..self.depth {
             
             let isect = scene.intersect(&ray);
-
+            
             // if there was no intersection stop bouncing.
             if isect.is_none() { 
                 // if this was the camera ray, add the emission from the background (since it wasn't directly sampled)
