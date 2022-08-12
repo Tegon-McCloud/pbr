@@ -4,6 +4,7 @@ pub use gltf::Glb;
 
 use itertools::izip;
 use nalgebra::Point2;
+use nalgebra::Vector2;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
 
@@ -13,12 +14,12 @@ use std::path::Path;
 use std::io::{Result, Error, ErrorKind};
 
 use super::Loader;
-use crate::material::LambertianMaterial;
-use crate::material::Material;
-use crate::scene::{SceneBuilder, Node, Mesh, Vertex};
-use crate::spectrum::Spectrum;
-use crate::texture::FactoredTexture;
-use crate::texture::Texture;
+use crate::{
+    material::{Material, Ggx, MicrofacetMaterial},
+    scene::{SceneBuilder, Node, Mesh, Vertex},
+    texture::{Texture, FactoredTexture},
+    spectrum::Spectrum,
+};
 
 use nalgebra::{Point3, Matrix4, Quaternion, convert, try_convert, Translation3, UnitQuaternion, Scale3, Affine3};
 struct GltfData(Vec<gltf::buffer::Data>, Vec<gltf::image::Data>);
@@ -97,60 +98,36 @@ fn make_mesh(gltf_prim: gltf::Primitive, data: &GltfData) -> Mesh {
         .collect();
 
     let material = make_material(gltf_prim.material(), data);
-    //let material = Box::new(LambertianMaterial::flat(&Vector3::from_element(1.0)));
     Mesh { indices, vertices, material }
 }
 
-fn make_material(gltf_material: gltf::Material, data: &GltfData) -> Box<dyn Material> {
+fn make_material(gltf_material: gltf::Material, _data: &GltfData) -> Box<dyn Material> {
 
     let pmr = gltf_material.pbr_metallic_roughness();
 
-    let base_color_factor = Spectrum::from(&pmr.base_color_factor()[0..3]);
-    //let metal_rough_factor = Vector2::new(pmr.metallic_factor(), pmr.roughness_factor());
+    //let base_color_factor = Spectrum::from(&pmr.base_color_factor()[0..3]);
+    let metal_rough_factor = Vector2::new(pmr.metallic_factor(), pmr.roughness_factor());
     
-    let base_color = FactoredTexture::new(
-        base_color_factor, 
-        pmr.base_color_texture().map(|info| make_texture(info.texture(), data)),
-    );
-    
-    let material: Box<dyn Material> = Box::new(LambertianMaterial::new(base_color));
-
-    // if metal_rough_factor.x == 0.0 {
-    //     material = Box::new(LambertianMaterial::new(&base_color_factor, base_color_texture));
-    // }  else {
-    //     material = Box::new(MetalMaterial::new(&base_color_factor));
-    // }
-
-    // let material = Box::new(
-    //     GltfMaterial::new(
-    //         base_color_factor,
-    //         metal_rough_factor,
-    //         None,
-    //         None
-    //     )
+    // let base_color = FactoredTexture::new(
+    //     base_color_factor, 
+    //     pmr.base_color_texture().map(|info| make_texture(info.texture(), data)),
     // );
-
-    // if let Some(base_color_texture) = pmr.base_color_texture() {
-    //     let base_color_texture = make_texture(base_color_texture.texture(), data);
-
-    //     material = Box::new(GltfMaterial::textured_with_factor(&base_color_factor, base_color_texture));
-    // } else {
-    //     material = Box::new(LambertianMaterial::flat(&base_color_factor));
-    // }
-
+    
+    let material: Box<dyn Material> = Box::new(MicrofacetMaterial::<Ggx>::new(metal_rough_factor.y));
+    
     material
 }
 
-fn make_texture(gtlf_texture: gltf::Texture, data: &GltfData) -> Texture<Spectrum<f32>> {
-    let img_data = &data.1[gtlf_texture.source().index()];
+// fn make_texture(gtlf_texture: gltf::Texture, data: &GltfData) -> Texture<Spectrum<f32>> {
+//     let img_data = &data.1[gtlf_texture.source().index()];
 
-    let pixels = &img_data.pixels;
-    let width = img_data.width;
-    let height = img_data.height;
+//     let pixels = &img_data.pixels;
+//     let width = img_data.width;
+//     let height = img_data.height;
 
-    match img_data.format {
-        gltf::image::Format::R8G8B8 => Texture::<Spectrum<f32>>::from_raw_data::<u8, 3>(width, height, pixels).unwrap(),
-        gltf::image::Format::R8G8B8A8 => Texture::<Spectrum<f32>>::from_raw_data::<u8, 4>(width, height, pixels).unwrap(),
-        _ => todo!(),
-    }
-}
+//     match img_data.format {
+//         gltf::image::Format::R8G8B8 => Texture::<Spectrum<f32>>::from_raw_data::<u8, 3>(width, height, pixels).unwrap(),
+//         gltf::image::Format::R8G8B8A8 => Texture::<Spectrum<f32>>::from_raw_data::<u8, 4>(width, height, pixels).unwrap(),
+//         _ => todo!(),
+//     }
+// }

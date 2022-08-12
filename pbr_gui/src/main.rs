@@ -8,7 +8,7 @@ use pbr_core::{
     light::{LightSource, SkySphere},
     camera::Camera,
     accelerator::Bvh,
-    integrator::{Integrator, PathTracer},
+    integrator::{Integrator, PathTracer, BruteForcer},
     nalgebra::{Point3, Vector3}
 };
 use winit::{
@@ -45,7 +45,7 @@ fn main() {
     
     println!("Build time: {}s", (std::time::Instant::now() - begin_time).as_secs_f32());
     
-    let integrator = PathTracer::new(4, 2048);
+    let integrator = BruteForcer::new(4, 2048);
 
     let event_loop = EventLoop::new();
     let size = LogicalSize::new(render_size.0, render_size.1);
