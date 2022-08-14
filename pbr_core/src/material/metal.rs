@@ -33,15 +33,23 @@ impl<T> Material for MetalMaterial<T> where
     T: MicrofacetDistribution + Send + Sync,
 {
     fn brdf(&self, _uv: &Point2<f32>, wi: &Vector3<f32>, wo: &Vector3<f32>) -> Spectrum<f32> {
-        let m = (wi + wo).normalize();
         let distribution = T::new_isotropic(self.roughness);
+
+        let idotn = ndot(&wi);
+        let odotn = ndot(&wo);
+        if idotn == 0.0 || odotn == 0.0 {
+            return Spectrum::black();
+        }
+
+        let m = wi + wo;
+        if m.x == 0.0 && m.y == 0.0 && m.z == 0.0 {
+            return Spectrum::black();
+        }
+        let m = m.normalize();
 
         let fresnel = conductor_fresnel(&self.base_reflectance, wi, &m);
         let density = distribution.facet_density(&m);
         let shadowing = distribution.shadowing(wi, &m) * distribution.shadowing(wo, &m);
-
-        let idotn = ndot(&wi);
-        let odotn = ndot(&wo);
 
         fresnel * (density * shadowing / (4.0 * idotn * odotn))
     }

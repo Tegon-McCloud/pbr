@@ -34,6 +34,8 @@ pub trait MicrofacetDistribution {
     fn sample_facet(&self, o: &Vector3<f32>) -> (Vector3<f32>, f32);
 }
 
+
+// Source: https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
 pub struct Ggx {
     alpha: f32,    
 }
@@ -58,18 +60,34 @@ impl MicrofacetDistribution for Ggx {
         let mdotn = ndot(m);
         let paren = (alpha2 - 1.0) * mdotn * mdotn + 1.0;
         
-        alpha2 * heavi(mdotn) / (PI * paren * paren)
+        let density = alpha2 * heavi(mdotn) / (PI * paren * paren);
+
+        if density.is_nan() {
+            println!("NaN density, m: {:?}", m);
+        }
+
+        density
     }
 
 
     fn shadowing(&self, v: &Vector3<f32>, m: &Vector3<f32>) -> f32 {
-        let alpha2 = self.alpha * self.alpha;
 
         let vdotm = m.dot(v);
         let vdotn = ndot(v);
-        let paren = alpha2 + (1.0 - alpha2) * vdotn * vdotn;
-    
-        heavi(vdotm / vdotn) * 2.0 * vdotn / (vdotn + paren.sqrt())   
+
+        let s = if (vdotm < 0.0) == (vdotn < 0.0) {
+            let alpha2 = self.alpha * self.alpha;
+            let paren = alpha2 + (1.0 - alpha2) * vdotn * vdotn;
+            2.0 * vdotn / (vdotn + paren.sqrt())
+        } else {
+            0.0
+        };
+
+        if s.is_nan() {
+            println!("NaN shadowing: v: {:?}, m: {:?}", v, m);
+        }
+
+        s
     }
 
     fn sample_facet(&self, _o: &Vector3<f32>) -> (Vector3<f32>, f32) {
@@ -84,6 +102,10 @@ impl MicrofacetDistribution for Ggx {
             theta_m.sin() * phi_m.sin(),
             theta_m.cos()
         );
+
+        if m.x.is_nan() || m.y.is_nan() || m.z.is_nan() {
+            println!("Bad facet sampled, theta: {}, phi: {}", theta_m, phi_m);
+        }
 
         let pdf = self.facet_density(&m) * ndot(&m);
 

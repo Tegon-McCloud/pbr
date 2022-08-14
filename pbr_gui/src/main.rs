@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 
 use std::ops::Mul;
 
@@ -47,7 +48,6 @@ fn main() {
     println!("Build time: {}s", (std::time::Instant::now() - begin_time).as_secs_f32());
     
     let integrator = BruteForcer::new(4, 512);
-    let tone_map = ReinhardToneMap::with_whitepoint(100.0);
     
     let event_loop = EventLoop::new();
     let size = LogicalSize::new(render_size.0, render_size.1);
@@ -66,11 +66,17 @@ fn main() {
     let _render_thread = std::thread::spawn(move || {
         let begin_time = std::time::Instant::now();
         
-        let mut render_img = integrator.render(&scene, render_size, |img| tx.send(img.clone()).unwrap_or(()));
-        tone_map.apply(&mut render_img);
+        let render_img = integrator.render(&scene, render_size, |img| tx.send(img.clone()).unwrap_or(()));
 
         println!("Render time: {}s", (std::time::Instant::now() - begin_time).as_secs_f32());
-        render_img.save("test.png");
+
+        let mut render_img_linear = render_img.clone();
+        LinearToneMap::new().apply(&mut render_img_linear);
+        render_img_linear.save("test_linear.png");
+
+        let mut render_img_reinhard = render_img.clone();
+        ReinhardToneMap::new().apply(&mut render_img_reinhard);
+        render_img_reinhard.save("test_reinhard.png");
     });
 
     event_loop.run(move |event, _, control_flow| {

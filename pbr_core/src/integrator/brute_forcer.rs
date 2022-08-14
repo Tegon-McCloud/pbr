@@ -33,15 +33,18 @@ impl BruteForcer
 
             let wo = w2t * -ray.direction;
             let sample = p.sample_brdf(&wo);
-            let sample_dir = t2w * sample.wi;
-
+            
             let next_ray = Ray {
                 origin: p.position + 0.0001 * p.normal,
-                direction: sample_dir,
-            };  
+                direction: t2w * sample.wi,
+            };
 
             let sample_radiance = self.sample_recursive(next_ray, scene, depth+1);
             
+            if sample.brdf.any_nan() {
+                println!("NaN BRDF: {:?}", sample.brdf);
+            }
+
             return sample.brdf * sample_radiance * (sample.wi.z / sample.pdf);
 
         } else {

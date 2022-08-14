@@ -1,4 +1,4 @@
-#![feature(sync_unsafe_cell)]
+#![feature(unboxed_closures)]
 
 pub use nalgebra;
 

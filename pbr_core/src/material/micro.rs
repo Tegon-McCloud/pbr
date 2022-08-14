@@ -32,16 +32,23 @@ impl<T> Material for MicrofacetMaterial<T> where
 
         let distribution = T::new_isotropic(self.roughness);
         
-        let m = (wi + wo).normalize();
-
-        let fresnel   = fresnel_schlick(wi, &m);
-        let distr     = distribution.facet_density(&m);
-        let shadowing = distribution.shadowing(wi, &m) * distribution.shadowing(wo, &m);
-
         let idotn = ndot(&wi);
         let odotn = ndot(&wo);
+        if idotn == 0.0 || odotn == 0.0 {
+            return Spectrum::black();
+        }
 
-        let brdf_value = fresnel * distr * shadowing / (4.0 * idotn * odotn);
+        let m = wi + wo;
+        if m.x == 0.0 && m.y == 0.0 && m.z == 0.0 {
+            return Spectrum::black();
+        }
+        let m = m.normalize();
+
+        let fresnel   = fresnel_schlick(wi, &m);
+        let density   = distribution.facet_density(&m);
+        let shadowing = distribution.shadowing(wi, &m) * distribution.shadowing(wo, &m);
+
+        let brdf_value = fresnel * density * shadowing / (4.0 * idotn * odotn);
 
         Spectrum::constant(brdf_value)
     }

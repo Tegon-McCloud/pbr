@@ -28,6 +28,15 @@ impl<T: Scalar> Spectrum<T> {
     }
 }
 
+impl Spectrum<f32> {
+    
+    pub fn any_nan(&self) -> bool {
+        self.r.is_nan() ||
+        self.g.is_nan() ||
+        self.b.is_nan()
+    } 
+}
+
 impl<T: Scalar> Spectrum<T> where
     T: Zero,
 {
