@@ -1,7 +1,38 @@
 use std::{ops::{Mul, Add, Sub, Div, MulAssign, AddAssign, SubAssign, DivAssign}};
 
 use nalgebra::{Scalar, ClosedMul, ClosedAdd, ClosedSub, ClosedDiv, Vector3};
-use num_traits::{Zero};
+use num_traits::{Zero, One};
+
+pub struct SpectrumIter<'a, T: Scalar> {
+    next_wavelength: usize,
+    spectrum: &'a Spectrum<T>
+}
+
+impl<'a, T: Scalar> Iterator for SpectrumIter<'a, T> {
+
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = match self.next_wavelength {
+            0 => Some(&self.spectrum.r),
+            1 => Some(&self.spectrum.g),
+            2 => Some(&self.spectrum.b),
+            _ => None,
+        };
+
+        self.next_wavelength += 1;
+
+        item
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = 3 - self.next_wavelength;
+        (len, Some(len))
+    }
+
+}
+
+impl<T: Scalar> ExactSizeIterator for SpectrumIter<'_, T> {}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -25,6 +56,25 @@ impl<T: Scalar> Spectrum<T> {
         f(&mut self.r);
         f(&mut self.g);
         f(&mut self.b);
+    }
+
+    pub fn apply_into(mut self, f: impl Fn(T) -> T) -> Spectrum<T> {
+        self.r = f(self.r);
+        self.g = f(self.g);
+        self.b = f(self.b);
+        self
+    }
+
+    pub fn iter<'s>(&'s self) -> impl Iterator<Item = &T> + 's {
+        SpectrumIter { next_wavelength: 0, spectrum: self }
+    }
+}
+
+impl<T> Spectrum<T> where
+    T: Scalar + Copy + One + ClosedAdd<T> + ClosedSub<T> + ClosedMul<T>
+{ 
+    pub fn lerp(a: &Spectrum<T>, b: &Spectrum<T>, t: T) -> Spectrum<T> {
+        a * (T::one() - t) + b * t
     }
 }
 
